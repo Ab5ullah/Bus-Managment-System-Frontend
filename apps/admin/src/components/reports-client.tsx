@@ -22,75 +22,100 @@ import {
   Label,
   Skeleton,
   Alert,
-  Badge,
   formatCurrencyPkr,
 } from "@busms/ui";
 import { useAuth } from "@busms/api-client/auth";
+import { API_ENDPOINTS } from "@busms/config/endpoints";
 import { adminFetch, formatShortDateTime } from "@/lib/admin-api";
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+// ─── Types (aligned with D:\Bus ticket\apps\reports\services.py) ─────────────
 
-interface RevenueGroup {
+interface RevenueSeriesItem {
   period: string;
-  total_revenue: string;
-  booking_count: number;
-  ticket_count: number;
-  avg_fare: string;
+  bookings_count: number;
+  total_collected: string;
+  refunds_issued: string;
+  net_revenue: string;
 }
 
 interface RevenueReport {
-  total_revenue: string;
-  total_bookings: number;
-  total_tickets: number;
-  avg_fare_per_ticket: string;
-  by_period: RevenueGroup[];
-  start_date: string;
-  end_date: string;
+  group_by: string;
+  start_date: string | null;
+  end_date: string | null;
+  summary: {
+    bookings_count: number;
+    gross_fare: string;
+    discounts: string;
+    tax_collected: string;
+    service_fees: string;
+    total_collected: string;
+    refunds_issued: string;
+    net_revenue: string;
+  };
+  series: RevenueSeriesItem[];
 }
 
 interface OccupancyTrip {
   trip_id: string;
+  trip_number: string;
   route_code: string;
+  route_name: string;
+  bus_registration: string;
   departure_datetime: string;
-  total_seats: number;
-  booked_seats: number;
-  occupancy_pct: number;
+  status: string;
+  bus_capacity: number;
+  booked_segments_count: number;
+  route_distance_km: string;
+  passenger_km: string;
+  seat_km: string;
+  load_factor_percentage: string | number;
 }
 
 interface OccupancyReport {
-  avg_occupancy_pct: number;
-  total_trips_analyzed: number;
+  summary: {
+    trips_evaluated: number;
+    total_passenger_km: string;
+    total_seat_km: string;
+    overall_load_factor_percentage: string | number;
+  };
   trips: OccupancyTrip[];
 }
 
 interface RoutePerf {
+  route_id: string;
   route_code: string;
-  origin_city: string;
-  destination_city: string;
-  total_bookings: number;
-  total_revenue: string;
-  avg_occupancy_pct: number;
-  peak_hour: number | null;
+  route_name: string;
+  seats_sold: number;
+  fare_revenue: string;
 }
 
 interface RoutePerformanceReport {
   top_routes: RoutePerf[];
-  date_range: { start: string; end: string };
+  peak_travel_hours: Array<{
+    hour: string;
+    passengers: number;
+    fare_revenue: string;
+  }>;
 }
 
 interface AgentSale {
   agent_id: string;
   agent_name: string;
-  phone: string;
-  total_bookings: number;
-  total_revenue: string;
-  total_tickets: number;
+  agent_phone: string;
+  bookings_count: number;
+  seats_sold: number;
+  gross_sales: string;
+  commission_earned: string;
 }
 
 interface AgentSalesReport {
+  commission_rate_percentage: string;
+  summary: {
+    total_agents: number;
+    total_gross_sales: string;
+    total_commissions_payable: string;
+  };
   agents: AgentSale[];
-  total_agents: number;
-  date_range: { start: string; end: string };
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -121,10 +146,10 @@ function BarChartMini({ data }: { data: { label: string; value: number }[] }) {
         <div key={i} className="group flex min-w-[20px] flex-1 flex-col items-center gap-1">
           <div
             className="w-full rounded-t bg-primary/70 transition-all group-hover:bg-primary"
-            style={{ height: `${(d.value / max) * 96}px` }}
+            style={{ height: `${Math.max(4, (d.value / max) * 96)}px` }}
             title={`${d.label}: ${d.value}`}
           />
-          <span className="max-w-[32px] overflow-hidden text-ellipsis whitespace-nowrap text-[9px] text-muted-foreground">
+          <span className="max-w-[40px] overflow-hidden text-ellipsis whitespace-nowrap text-[9px] text-muted-foreground">
             {d.label}
           </span>
         </div>
@@ -136,8 +161,9 @@ function BarChartMini({ data }: { data: { label: string; value: number }[] }) {
 // ─── Occupancy gauge ─────────────────────────────────────────────────────────
 
 function OccupancyGauge({ pct }: { pct: number }) {
+  const safePct = Number.isFinite(pct) ? Math.min(100, Math.max(0, pct)) : 0;
   const color =
-    pct >= 80 ? "text-green-600" : pct >= 50 ? "text-amber-600" : "text-red-500";
+    safePct >= 80 ? "text-green-600" : safePct >= 50 ? "text-amber-600" : "text-red-500";
   return (
     <div className="flex items-center gap-2">
       <div className="relative h-10 w-10 shrink-0">
@@ -149,13 +175,13 @@ function OccupancyGauge({ pct }: { pct: number }) {
             r="15"
             fill="none"
             strokeWidth="3"
-            strokeDasharray={`${(pct / 100) * 94} 94`}
+            strokeDasharray={`${(safePct / 100) * 94} 94`}
             className={color}
             stroke="currentColor"
           />
         </svg>
         <span className={`absolute inset-0 flex items-center justify-center text-[9px] font-bold ${color}`}>
-          {pct.toFixed(0)}%
+          {safePct.toFixed(0)}%
         </span>
       </div>
     </div>
@@ -178,7 +204,7 @@ export function ReportsClient() {
     queryKey: ["reports-revenue", startDate, endDate, groupBy],
     queryFn: () =>
       adminFetch<RevenueReport>(
-        `/api/admin/reports/revenue/?start_date=${startDate}&end_date=${endDate}&group_by=${groupBy}`,
+        `${API_ENDPOINTS.ADMIN_REPORTS.REVENUE}?start_date=${startDate}&end_date=${endDate}&group_by=${groupBy}`,
         getToken
       ),
     enabled: tab === "revenue",
@@ -190,7 +216,7 @@ export function ReportsClient() {
     queryKey: ["reports-occupancy", startDate, endDate],
     queryFn: () =>
       adminFetch<OccupancyReport>(
-        `/api/admin/reports/occupancy/?start_date=${startDate}&end_date=${endDate}`,
+        `${API_ENDPOINTS.ADMIN_REPORTS.OCCUPANCY}?start_date=${startDate}&end_date=${endDate}`,
         getToken
       ),
     enabled: tab === "occupancy",
@@ -202,7 +228,7 @@ export function ReportsClient() {
     queryKey: ["reports-routes", startDate, endDate],
     queryFn: () =>
       adminFetch<RoutePerformanceReport>(
-        `/api/admin/reports/route-performance/?start_date=${startDate}&end_date=${endDate}`,
+        `${API_ENDPOINTS.ADMIN_REPORTS.ROUTE_PERFORMANCE}?start_date=${startDate}&end_date=${endDate}`,
         getToken
       ),
     enabled: tab === "routes",
@@ -214,7 +240,7 @@ export function ReportsClient() {
     queryKey: ["reports-agents", startDate, endDate],
     queryFn: () =>
       adminFetch<AgentSalesReport>(
-        `/api/admin/reports/agent-sales/?start_date=${startDate}&end_date=${endDate}`,
+        `${API_ENDPOINTS.ADMIN_REPORTS.AGENT_SALES}?start_date=${startDate}&end_date=${endDate}`,
         getToken
       ),
     enabled: tab === "agents",
@@ -227,24 +253,22 @@ export function ReportsClient() {
       const token = await getToken();
       const baseUrl =
         process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://127.0.0.1:8000";
-      const url = `${baseUrl}/api/admin/reports/export/?type=${type}&format=${format}&start_date=${startDate}&end_date=${endDate}`;
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `${type}_${startDate}_${endDate}.${format}`;
-      // Attach auth header via fetch + blob
+      const url = `${baseUrl}${API_ENDPOINTS.ADMIN_REPORTS.EXPORT}?type=${type}&format=${format}&start_date=${startDate}&end_date=${endDate}`;
       const res = await fetch(url, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) throw new Error("Export failed");
       const blob = await res.blob();
       const objectUrl = URL.createObjectURL(blob);
+      const link = document.createElement("a");
       link.href = objectUrl;
+      link.download = `${type}_${startDate}_${endDate}.${format}`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(objectUrl);
     } catch {
-      // Show inline error
+      // ignore
     }
   };
 
@@ -258,7 +282,12 @@ export function ReportsClient() {
   const isLoading = currentQuery.isLoading;
   const isError = currentQuery.isError;
 
-  // ─── RENDER ───────────────────────────────────────────────────────────────
+  const revSummary = revenueQuery.data?.summary;
+  const revSeries = revenueQuery.data?.series ?? [];
+  const occSummary = occupancyQuery.data?.summary;
+  const occTrips = occupancyQuery.data?.trips ?? [];
+  const topRoutes = routeQuery.data?.top_routes ?? [];
+  const agentList = agentQuery.data?.agents ?? [];
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
@@ -377,31 +406,30 @@ export function ReportsClient() {
             </div>
           ) : revenueQuery.data ? (
             <>
-              {/* KPI Cards */}
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 {[
                   {
                     icon: DollarSign,
                     label: t("reports.totalRevenue"),
-                    value: formatCurrencyPkr(Number(revenueQuery.data.total_revenue)),
+                    value: formatCurrencyPkr(Number(revSummary?.net_revenue ?? 0)),
                     color: "text-green-600",
                   },
                   {
                     icon: BarChart3,
                     label: t("reports.totalBookings"),
-                    value: revenueQuery.data.total_bookings.toLocaleString(),
+                    value: Number(revSummary?.bookings_count ?? 0).toLocaleString(),
                     color: "text-blue-600",
                   },
                   {
                     icon: TrendingUp,
-                    label: t("reports.totalTickets"),
-                    value: revenueQuery.data.total_tickets.toLocaleString(),
+                    label: "Total Collected",
+                    value: formatCurrencyPkr(Number(revSummary?.total_collected ?? 0)),
                     color: "text-primary",
                   },
                   {
                     icon: Award,
-                    label: t("reports.avgFare"),
-                    value: formatCurrencyPkr(Number(revenueQuery.data.avg_fare_per_ticket)),
+                    label: "Refunds Issued",
+                    value: formatCurrencyPkr(Number(revSummary?.refunds_issued ?? 0)),
                     color: "text-purple-600",
                   },
                 ].map(({ icon: Icon, label, value, color }) => (
@@ -419,8 +447,7 @@ export function ReportsClient() {
                 ))}
               </div>
 
-              {/* Chart */}
-              {revenueQuery.data.by_period.length > 0 && (
+              {revSeries.length > 0 && (
                 <Card className="p-5">
                   <div className="mb-3 flex items-center justify-between">
                     <h2 className="font-semibold">{t("reports.revenueChart")}</h2>
@@ -444,41 +471,49 @@ export function ReportsClient() {
                     </div>
                   </div>
                   <BarChartMini
-                    data={revenueQuery.data.by_period.map((g) => ({
-                      label: g.period.slice(5), // "MM-DD"
-                      value: Number(g.total_revenue),
+                    data={revSeries.map((g) => ({
+                      label: String(g.period).slice(0, 10),
+                      value: Number(g.net_revenue ?? 0),
                     }))}
                   />
                 </Card>
               )}
 
-              {/* Period table */}
               <Card className="overflow-hidden">
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b bg-muted/40 text-xs text-muted-foreground">
                         <th className="px-4 py-3 text-start font-medium">{t("reports.period")}</th>
-                        <th className="px-4 py-3 text-end font-medium">{t("reports.revenue")}</th>
                         <th className="px-4 py-3 text-end font-medium">{t("reports.bookings")}</th>
-                        <th className="px-4 py-3 text-end font-medium">{t("reports.tickets")}</th>
-                        <th className="px-4 py-3 text-end font-medium">{t("reports.avgFare")}</th>
+                        <th className="px-4 py-3 text-end font-medium">Collected</th>
+                        <th className="px-4 py-3 text-end font-medium">Refunds</th>
+                        <th className="px-4 py-3 text-end font-medium">{t("reports.revenue")}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y">
-                      {revenueQuery.data.by_period.map((g) => (
+                      {revSeries.map((g) => (
                         <tr key={g.period} className="hover:bg-muted/30 transition-colors">
-                          <td className="px-4 py-3 font-mono text-xs">{g.period}</td>
-                          <td className="px-4 py-3 text-end font-medium text-green-600">
-                            {formatCurrencyPkr(Number(g.total_revenue))}
+                          <td className="px-4 py-3 font-mono text-xs">{String(g.period).slice(0, 10)}</td>
+                          <td className="px-4 py-3 text-end">{g.bookings_count}</td>
+                          <td className="px-4 py-3 text-end">
+                            {formatCurrencyPkr(Number(g.total_collected ?? 0))}
                           </td>
-                          <td className="px-4 py-3 text-end">{g.booking_count}</td>
-                          <td className="px-4 py-3 text-end">{g.ticket_count}</td>
                           <td className="px-4 py-3 text-end text-muted-foreground">
-                            {formatCurrencyPkr(Number(g.avg_fare))}
+                            {formatCurrencyPkr(Number(g.refunds_issued ?? 0))}
+                          </td>
+                          <td className="px-4 py-3 text-end font-medium text-green-600">
+                            {formatCurrencyPkr(Number(g.net_revenue ?? 0))}
                           </td>
                         </tr>
                       ))}
+                      {revSeries.length === 0 && (
+                        <tr>
+                          <td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">
+                            No revenue records in this date range.
+                          </td>
+                        </tr>
+                      )}
                     </tbody>
                   </table>
                 </div>
@@ -499,16 +534,16 @@ export function ReportsClient() {
                 <Card className="p-5">
                   <p className="text-xs text-muted-foreground">{t("reports.avgOccupancy")}</p>
                   <div className="mt-3 flex items-center gap-4">
-                    <OccupancyGauge pct={occupancyQuery.data.avg_occupancy_pct} />
+                    <OccupancyGauge pct={Number(occSummary?.overall_load_factor_percentage ?? 0)} />
                     <p className="text-3xl font-bold">
-                      {formatPct(occupancyQuery.data.avg_occupancy_pct)}
+                      {formatPct(occSummary?.overall_load_factor_percentage)}
                     </p>
                   </div>
                 </Card>
                 <Card className="p-5">
                   <p className="text-xs text-muted-foreground">{t("reports.tripsAnalyzed")}</p>
                   <p className="mt-3 text-3xl font-bold">
-                    {occupancyQuery.data.total_trips_analyzed}
+                    {occSummary?.trips_evaluated ?? 0}
                   </p>
                   <div className="mt-3 flex gap-2">
                     <Button
@@ -543,38 +578,44 @@ export function ReportsClient() {
                       </tr>
                     </thead>
                     <tbody className="divide-y">
-                      {occupancyQuery.data.trips.map((trip) => (
-                        <tr key={trip.trip_id} className="hover:bg-muted/30 transition-colors">
-                          <td className="px-4 py-3 font-mono text-xs">
-                            {trip.trip_id.slice(0, 8)}…
-                          </td>
-                          <td className="px-4 py-3 font-medium">{trip.route_code}</td>
-                          <td className="px-4 py-3 text-xs text-muted-foreground">
-                            {formatShortDateTime(trip.departure_datetime)}
-                          </td>
-                          <td className="px-4 py-3 text-end">{trip.total_seats}</td>
-                          <td className="px-4 py-3 text-end">{trip.booked_seats}</td>
-                          <td className="px-4 py-3 text-end">
-                            <div className="flex items-center justify-end gap-2">
-                              <div className="h-1.5 w-16 overflow-hidden rounded-full bg-muted">
-                                <div
-                                  className={`h-full rounded-full ${
-                                    trip.occupancy_pct >= 80
-                                      ? "bg-green-500"
-                                      : trip.occupancy_pct >= 50
-                                      ? "bg-amber-500"
-                                      : "bg-red-400"
-                                  }`}
-                                  style={{ width: `${trip.occupancy_pct}%` }}
-                                />
+                      {occTrips.map((trip) => {
+                        const lf = Number(trip.load_factor_percentage ?? 0);
+                        return (
+                          <tr key={trip.trip_id} className="hover:bg-muted/30 transition-colors">
+                            <td className="px-4 py-3 font-mono text-xs">{trip.trip_number}</td>
+                            <td className="px-4 py-3 font-medium">{trip.route_code}</td>
+                            <td className="px-4 py-3 text-xs text-muted-foreground">
+                              {formatShortDateTime(trip.departure_datetime)}
+                            </td>
+                            <td className="px-4 py-3 text-end">{trip.bus_capacity}</td>
+                            <td className="px-4 py-3 text-end">{trip.booked_segments_count}</td>
+                            <td className="px-4 py-3 text-end">
+                              <div className="flex items-center justify-end gap-2">
+                                <div className="h-1.5 w-16 overflow-hidden rounded-full bg-muted">
+                                  <div
+                                    className={`h-full rounded-full ${
+                                      lf >= 80
+                                        ? "bg-green-500"
+                                        : lf >= 50
+                                        ? "bg-amber-500"
+                                        : "bg-red-400"
+                                    }`}
+                                    style={{ width: `${Math.min(100, lf)}%` }}
+                                  />
+                                </div>
+                                <span className="text-xs font-medium">{formatPct(lf)}</span>
                               </div>
-                              <span className="text-xs font-medium">
-                                {formatPct(trip.occupancy_pct)}
-                              </span>
-                            </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                      {occTrips.length === 0 && (
+                        <tr>
+                          <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
+                            No trips evaluated in this date range.
                           </td>
                         </tr>
-                      ))}
+                      )}
                     </tbody>
                   </table>
                 </div>
@@ -608,14 +649,13 @@ export function ReportsClient() {
                 </Button>
               </div>
 
-              {/* Top revenue chart */}
-              {routeQuery.data.top_routes.length > 0 && (
+              {topRoutes.length > 0 && (
                 <Card className="p-5">
                   <h2 className="mb-3 font-semibold">{t("reports.revenueByRoute")}</h2>
                   <BarChartMini
-                    data={routeQuery.data.top_routes.slice(0, 10).map((r) => ({
+                    data={topRoutes.slice(0, 10).map((r) => ({
                       label: r.route_code,
-                      value: Number(r.total_revenue),
+                      value: Number(r.fare_revenue ?? 0),
                     }))}
                   />
                 </Card>
@@ -628,15 +668,13 @@ export function ReportsClient() {
                       <tr className="border-b bg-muted/40 text-xs text-muted-foreground">
                         <th className="px-4 py-3 text-start font-medium">{t("reports.route")}</th>
                         <th className="px-4 py-3 text-start font-medium">{t("reports.corridor")}</th>
-                        <th className="px-4 py-3 text-end font-medium">{t("reports.bookings")}</th>
+                        <th className="px-4 py-3 text-end font-medium">{t("reports.seats")}</th>
                         <th className="px-4 py-3 text-end font-medium">{t("reports.revenue")}</th>
-                        <th className="px-4 py-3 text-end font-medium">{t("reports.loadFactor")}</th>
-                        <th className="px-4 py-3 text-end font-medium">{t("reports.peakHour")}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y">
-                      {routeQuery.data.top_routes.map((r, i) => (
-                        <tr key={r.route_code} className="hover:bg-muted/30 transition-colors">
+                      {topRoutes.map((r, i) => (
+                        <tr key={r.route_id} className="hover:bg-muted/30 transition-colors">
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-2">
                               {i < 3 && (
@@ -653,32 +691,20 @@ export function ReportsClient() {
                               <span className="font-mono font-medium">{r.route_code}</span>
                             </div>
                           </td>
-                          <td className="px-4 py-3 text-muted-foreground">
-                            {r.origin_city} → {r.destination_city}
-                          </td>
-                          <td className="px-4 py-3 text-end">{r.total_bookings}</td>
+                          <td className="px-4 py-3 text-muted-foreground">{r.route_name}</td>
+                          <td className="px-4 py-3 text-end">{r.seats_sold}</td>
                           <td className="px-4 py-3 text-end font-medium text-green-600">
-                            {formatCurrencyPkr(Number(r.total_revenue))}
-                          </td>
-                          <td className="px-4 py-3 text-end">
-                            <Badge
-                              variant={
-                                r.avg_occupancy_pct >= 80
-                                  ? "success"
-                                  : r.avg_occupancy_pct >= 50
-                                  ? "warning"
-                                  : "neutral"
-                              }
-                              className="text-xs"
-                            >
-                              {formatPct(r.avg_occupancy_pct)}
-                            </Badge>
-                          </td>
-                          <td className="px-4 py-3 text-end text-muted-foreground">
-                            {r.peak_hour != null ? `${r.peak_hour}:00` : "—"}
+                            {formatCurrencyPkr(Number(r.fare_revenue ?? 0))}
                           </td>
                         </tr>
                       ))}
+                      {topRoutes.length === 0 && (
+                        <tr>
+                          <td colSpan={4} className="px-4 py-8 text-center text-muted-foreground">
+                            No route performance data in this date range.
+                          </td>
+                        </tr>
+                      )}
                     </tbody>
                   </table>
                 </div>
@@ -697,7 +723,8 @@ export function ReportsClient() {
             <>
               <div className="flex items-center justify-between">
                 <div className="text-sm text-muted-foreground">
-                  {agentQuery.data.total_agents} {t("reports.agentsInPeriod")}
+                  {agentQuery.data.summary?.total_agents ?? agentList.length}{" "}
+                  {t("reports.agentsInPeriod")}
                 </div>
                 <div className="flex gap-2">
                   <Button
@@ -726,26 +753,30 @@ export function ReportsClient() {
                         <th className="px-4 py-3 text-start font-medium">{t("reports.agent")}</th>
                         <th className="px-4 py-3 text-start font-medium">{t("reports.phone")}</th>
                         <th className="px-4 py-3 text-end font-medium">{t("reports.bookings")}</th>
-                        <th className="px-4 py-3 text-end font-medium">{t("reports.tickets")}</th>
+                        <th className="px-4 py-3 text-end font-medium">{t("reports.seats")}</th>
                         <th className="px-4 py-3 text-end font-medium">{t("reports.revenue")}</th>
+                        <th className="px-4 py-3 text-end font-medium">Commission</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y">
-                      {agentQuery.data.agents.map((agent, i) => (
+                      {agentList.map((agent, i) => (
                         <tr key={agent.agent_id} className="hover:bg-muted/30 transition-colors">
                           <td className="px-4 py-3 text-muted-foreground">{i + 1}</td>
                           <td className="px-4 py-3 font-medium">{agent.agent_name}</td>
-                          <td className="px-4 py-3 font-mono text-xs">{agent.phone}</td>
-                          <td className="px-4 py-3 text-end">{agent.total_bookings}</td>
-                          <td className="px-4 py-3 text-end">{agent.total_tickets}</td>
+                          <td className="px-4 py-3 font-mono text-xs">{agent.agent_phone}</td>
+                          <td className="px-4 py-3 text-end">{agent.bookings_count}</td>
+                          <td className="px-4 py-3 text-end">{agent.seats_sold}</td>
                           <td className="px-4 py-3 text-end font-medium text-green-600">
-                            {formatCurrencyPkr(Number(agent.total_revenue))}
+                            {formatCurrencyPkr(Number(agent.gross_sales ?? 0))}
+                          </td>
+                          <td className="px-4 py-3 text-end text-muted-foreground">
+                            {formatCurrencyPkr(Number(agent.commission_earned ?? 0))}
                           </td>
                         </tr>
                       ))}
-                      {agentQuery.data.agents.length === 0 && (
+                      {agentList.length === 0 && (
                         <tr>
-                          <td colSpan={6} className="px-4 py-10 text-center text-muted-foreground">
+                          <td colSpan={7} className="px-4 py-10 text-center text-muted-foreground">
                             {t("reports.noAgents")}
                           </td>
                         </tr>

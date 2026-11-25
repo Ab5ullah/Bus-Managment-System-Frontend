@@ -30,6 +30,8 @@ import {
   formatCurrencyPkr,
 } from "@busms/ui";
 import { useAuth } from "@busms/api-client/auth";
+import { normalizePaginated, type PaginatedData } from "@busms/api-client";
+import { API_ENDPOINTS } from "@busms/config/endpoints";
 import { adminFetch, formatShortDateTime } from "@/lib/admin-api";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -96,7 +98,7 @@ export function GateScannerClient() {
 
   const validateMutation = useMutation({
     mutationFn: (qrToken: string) =>
-      adminFetch<ValidateQrResponse>("/api/tickets/validate-qr/", getToken, {
+      adminFetch<ValidateQrResponse>(API_ENDPOINTS.TICKETS.VALIDATE_QR, getToken, {
         method: "POST",
         body: JSON.stringify({ qr_token: qrToken }),
       }),
@@ -116,7 +118,7 @@ export function GateScannerClient() {
 
   const boardMutation = useMutation({
     mutationFn: (qrToken: string) =>
-      adminFetch<BoardResponse>("/api/tickets/board/", getToken, {
+      adminFetch<BoardResponse>(API_ENDPOINTS.TICKETS.BOARD, getToken, {
         method: "POST",
         body: JSON.stringify({ qr_token: qrToken }),
       }),
@@ -196,23 +198,25 @@ export function GateScannerClient() {
       if (scanIntervalRef.current) clearInterval(scanIntervalRef.current);
       if (stream) stream.getTracks().forEach((t) => t.stop());
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scanMode]);
 
   // ─── Manifest ─────────────────────────────────────────────────────────────
 
   const manifestQuery = useQuery({
     queryKey: ["manifest", tripId, manifestPage],
-    queryFn: () =>
-      adminFetch<{ results: ManifestEntry[]; count: number }>(
-        `/api/tickets/manifest/${tripId}/?page=${manifestPage}&page_size=20`,
+    queryFn: async () => {
+      const raw = await adminFetch<PaginatedData<ManifestEntry> | ManifestEntry[]>(
+        `${API_ENDPOINTS.TICKETS.manifest(tripId)}?page=${manifestPage}&page_size=20`,
         getToken
-      ),
+      );
+      return normalizePaginated(raw, 20);
+    },
     enabled: !!tripId && viewMode === "manifest",
   });
 
   const boardedCount =
-    manifestQuery.data?.results.filter((e) => e.status === "BOARDED").length ?? 0;
+    (manifestQuery.data?.results ?? []).filter((e) => e.status === "BOARDED").length;
 
   // ─── RENDER ───────────────────────────────────────────────────────────────
 
@@ -348,11 +352,10 @@ export function GateScannerClient() {
             {/* Valid ticket */}
             {validated && !boarded && (
               <Card
-                className={`p-5 ${
-                  validated.is_eligible_to_board
-                    ? "border-green-300 bg-green-50/50 dark:border-green-800 dark:bg-green-900/20"
-                    : "border-red-300 bg-red-50/50 dark:border-red-800 dark:bg-red-900/20"
-                }`}
+                className={`p-5 ${validated.is_eligible_to_board
+                  ? "border-green-300 bg-green-50/50 dark:border-green-800 dark:bg-green-900/20"
+                  : "border-red-300 bg-red-50/50 dark:border-red-800 dark:bg-red-900/20"
+                  }`}
               >
                 <div className="mb-4 flex items-center gap-3">
                   {validated.is_eligible_to_board ? (
@@ -519,14 +522,13 @@ export function GateScannerClient() {
                       </tr>
                     </thead>
                     <tbody className="divide-y">
-                      {manifestQuery.data.results.map((entry) => (
+                      {(manifestQuery.data.results ?? []).map((entry) => (
                         <tr
                           key={entry.ticket_number}
-                          className={`transition-colors ${
-                            entry.status === "BOARDED"
-                              ? "bg-green-50/40 dark:bg-green-900/10"
-                              : "hover:bg-muted/30"
-                          }`}
+                          className={`transition-colors ${entry.status === "BOARDED"
+                            ? "bg-green-50/40 dark:bg-green-900/10"
+                            : "hover:bg-muted/30"
+                            }`}
                         >
                           <td className="px-4 py-3 font-mono text-xs">{entry.ticket_number}</td>
                           <td className="px-4 py-3 font-medium">{entry.passenger_name}</td>

@@ -1,5 +1,6 @@
 import { getTranslations } from "next-intl/server";
 import type { Metadata } from "next";
+import { OpsShell } from "@/components/ops-shell";
 import { CounterPosClient } from "@/components/counter-pos-client";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -8,5 +9,9 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default function CounterPosPage() {
-  return <CounterPosClient />;
+  return (
+    <OpsShell>
+      <CounterPosClient />
+    </OpsShell>
+  );
 }

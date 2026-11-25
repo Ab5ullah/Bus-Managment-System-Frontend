@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { Gender, MAX_SEATS_PER_BOOKING } from "@busms/config/constants";
 import { checkoutFormSchema, type CheckoutFormValues } from "@busms/config/schemas";
-import { ApiException, getDefaultApiBaseUrl } from "@busms/api-client";
+import { ApiException, API_ENDPOINTS, getDefaultApiBaseUrl } from "@busms/api-client";
 import { useAuth } from "@busms/api-client/auth";
 import {
   Alert,
@@ -235,7 +235,7 @@ export function SeatBookingFlow({
     queryKey: ["seat-map", tripId, fromStopId, toStopId],
     queryFn: () =>
       fetchJsonWithClient<SeatMapResponseData>(
-        `${baseUrl}/api/search/trips/${encodeURIComponent(tripId)}/seat-map/?from_stop=${encodeURIComponent(
+        `${baseUrl}${API_ENDPOINTS.SEARCH.seatMap(tripId)}?from_stop=${encodeURIComponent(
           fromStopId
         )}&to_stop=${encodeURIComponent(toStopId)}`
       ),
@@ -352,7 +352,7 @@ export function SeatBookingFlow({
           return [id, g];
         })
       );
-      const locked = await fetchJsonWithClient<LockState>(`${baseUrl}/api/bookings/lock-seats/`, {
+      const locked = await fetchJsonWithClient<LockState>(`${baseUrl}${API_ENDPOINTS.BOOKINGS.LOCK_SEATS}`, {
         method: "POST",
         token,
         body: JSON.stringify({
@@ -384,7 +384,7 @@ export function SeatBookingFlow({
     setStepError(null);
     window.sessionStorage.removeItem(storageKey);
 
-    await fetch(`${baseUrl}/api/bookings/unlock-seats/`, {
+    await fetch(`${baseUrl}${API_ENDPOINTS.BOOKINGS.UNLOCK_SEATS}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ lock_token: tokenToRelease }),
@@ -409,7 +409,7 @@ export function SeatBookingFlow({
     try {
       const token = await getValidAccessToken();
       const preview = await fetchJsonWithClient<CouponPreview>(
-        `${baseUrl}/api/promotions/validate-coupon/`,
+        `${baseUrl}${API_ENDPOINTS.PROMOTIONS.VALIDATE_COUPON}`,
         {
           method: "POST",
           token,
@@ -437,7 +437,7 @@ export function SeatBookingFlow({
     try {
       const token = await getValidAccessToken();
       const created = await fetchJsonWithClient<CreatedBookingSummary>(
-        `${baseUrl}/api/bookings/create/`,
+        `${baseUrl}${API_ENDPOINTS.BOOKINGS.CREATE}`,
         {
           method: "POST",
           token,

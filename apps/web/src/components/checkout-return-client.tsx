@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useQuery } from "@tanstack/react-query";
 import { AlertCircle, CheckCircle2, Download, Loader2, QrCode, Receipt } from "lucide-react";
-import { ApiException, getDefaultApiBaseUrl } from "@busms/api-client";
+import { ApiException, API_ENDPOINTS, getDefaultApiBaseUrl } from "@busms/api-client";
 import { useAuth } from "@busms/api-client/auth";
 import {
   Alert,
@@ -76,7 +76,7 @@ export function CheckoutReturnClient() {
   useEffect(() => {
     if (!sessionId || paymentStatus !== "success" || verifiedSessionRef.current) return;
     verifiedSessionRef.current = true;
-    void fetch(`${baseUrl}/api/payments/verify-stripe-session/`, {
+    void fetch(`${baseUrl}${API_ENDPOINTS.PAYMENTS.VERIFY_STRIPE_SESSION}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ session_id: sessionId }),
@@ -88,7 +88,7 @@ export function CheckoutReturnClient() {
     queryKey: ["booking-return", pnr],
     queryFn: async () => {
       const token = await getValidAccessToken();
-      const res = await fetch(`${baseUrl}/api/bookings/${encodeURIComponent(pnr)}/`, {
+      const res = await fetch(`${baseUrl}${API_ENDPOINTS.BOOKINGS.detail(pnr)}`, {
         headers: token ? { Authorization: `Bearer ${token}` } : undefined,
       });
       const json = await res.json().catch(() => null);
@@ -106,7 +106,7 @@ export function CheckoutReturnClient() {
   const paymentsQuery = useQuery({
     queryKey: ["booking-payments", pnr],
     queryFn: async () => {
-      const res = await fetch(`${baseUrl}/api/payments/booking/${encodeURIComponent(pnr)}/`);
+      const res = await fetch(`${baseUrl}${API_ENDPOINTS.PAYMENTS.byBooking(pnr)}`);
       const json = await res.json().catch(() => null);
       if (!res.ok || !json?.success) return [] as PaymentWithReceipt[];
       return (json.data ?? []) as PaymentWithReceipt[];
@@ -117,7 +117,7 @@ export function CheckoutReturnClient() {
   const ticketsQuery = useQuery({
     queryKey: ["booking-tickets", pnr],
     queryFn: async () => {
-      const res = await fetch(`${baseUrl}/api/tickets/booking/${encodeURIComponent(pnr)}/`);
+      const res = await fetch(`${baseUrl}${API_ENDPOINTS.TICKETS.byBooking(pnr)}`);
       const json = await res.json().catch(() => null);
       if (!res.ok || !json?.success) return [] as IssuedTicketItem[];
       return (json.data ?? []) as IssuedTicketItem[];
@@ -135,7 +135,7 @@ export function CheckoutReturnClient() {
     queryKey: ["payment-receipt", activeReceiptNumber],
     queryFn: async () => {
       const res = await fetch(
-        `${baseUrl}/api/payments/receipt/${encodeURIComponent(activeReceiptNumber)}/`
+        `${baseUrl}${API_ENDPOINTS.PAYMENTS.receipt(activeReceiptNumber)}`
       );
       const json = await res.json().catch(() => null);
       if (!res.ok || !json?.success) return null;
@@ -347,7 +347,7 @@ export function CheckoutReturnClient() {
                   </div>
 
                   <a
-                    href={`${baseUrl}/api/tickets/${encodeURIComponent(ticket.ticket_number)}/pdf/`}
+                    href={`${baseUrl}${API_ENDPOINTS.TICKETS.pdf(ticket.ticket_number)}`}
                     target="_blank"
                     rel="noopener noreferrer"
                   >

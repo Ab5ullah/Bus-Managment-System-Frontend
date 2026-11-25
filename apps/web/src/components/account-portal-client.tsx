@@ -21,6 +21,7 @@ import { Gender } from "@busms/config/constants";
 import { savedPassengerSchema, type SavedPassengerFormValues } from "@busms/config/schemas";
 import {
   ApiException,
+  API_ENDPOINTS,
   getDefaultApiBaseUrl,
   normalizePaginated,
   type PaginatedData,
@@ -107,7 +108,7 @@ export function AccountPortalClient() {
       });
       if (bookingFilter) qs.set("filter", bookingFilter);
 
-      const res = await fetch(`${baseUrl}/api/bookings/?${qs.toString()}`, {
+      const res = await fetch(`${baseUrl}${API_ENDPOINTS.BOOKINGS.LIST}?${qs.toString()}`, {
         headers: token ? { Authorization: `Bearer ${token}` } : undefined,
       });
       const json = await res.json().catch(() => null);
@@ -126,7 +127,7 @@ export function AccountPortalClient() {
     queryKey: ["saved-passengers"],
     queryFn: async () => {
       const token = await getValidAccessToken();
-      const res = await fetch(`${baseUrl}/api/accounts/saved-passengers/`, {
+      const res = await fetch(`${baseUrl}${API_ENDPOINTS.ACCOUNTS.SAVED_PASSENGERS}`, {
         headers: token ? { Authorization: `Bearer ${token}` } : undefined,
       });
       const json = await res.json().catch(() => null);
@@ -157,7 +158,7 @@ export function AccountPortalClient() {
     setLookupResult(null);
     setIsLookingUp(true);
     try {
-      const res = await fetch(`${baseUrl}/api/bookings/${encodeURIComponent(cleaned)}/`);
+      const res = await fetch(`${baseUrl}${API_ENDPOINTS.BOOKINGS.detail(cleaned)}`);
       const json = await res.json().catch(() => null);
       if (!res.ok || !json?.success) {
         setLookupError(json?.error?.message || `No booking found for PNR '${cleaned}'.`);
@@ -176,8 +177,8 @@ export function AccountPortalClient() {
     try {
       const token = await getValidAccessToken();
       const url = editingCompanion
-        ? `${baseUrl}/api/accounts/saved-passengers/${editingCompanion.id}/`
-        : `${baseUrl}/api/accounts/saved-passengers/`;
+        ? `${baseUrl}${API_ENDPOINTS.ACCOUNTS.savedPassengerDetail(editingCompanion.id)}`
+        : `${baseUrl}${API_ENDPOINTS.ACCOUNTS.SAVED_PASSENGERS}`;
       const method = editingCompanion ? "PUT" : "POST";
 
       const res = await fetch(url, {
@@ -203,7 +204,7 @@ export function AccountPortalClient() {
 
   const handleDeleteCompanion = async (id: string) => {
     const token = await getValidAccessToken();
-    await fetch(`${baseUrl}/api/accounts/saved-passengers/${id}/`, {
+    await fetch(`${baseUrl}${API_ENDPOINTS.ACCOUNTS.savedPassengerDetail(id)}`, {
       method: "DELETE",
       headers: token ? { Authorization: `Bearer ${token}` } : undefined,
     });
@@ -214,7 +215,7 @@ export function AccountPortalClient() {
     e.preventDefault();
     setProfileMsg(null);
     const token = await getValidAccessToken();
-    const res = await fetch(`${baseUrl}/api/accounts/profile/`, {
+    const res = await fetch(`${baseUrl}${API_ENDPOINTS.ACCOUNTS.PROFILE}`, {
       method: "PUT",
       headers: {
         "Content-Type": "application/json",
@@ -237,7 +238,7 @@ export function AccountPortalClient() {
   const refreshBookingsAfterCancel = async () => {
     await queryClient.invalidateQueries({ queryKey: ["my-bookings"] });
     if (lookupResult) {
-      const res = await fetch(`${baseUrl}/api/bookings/${encodeURIComponent(lookupResult.pnr)}/`);
+      const res = await fetch(`${baseUrl}${API_ENDPOINTS.BOOKINGS.detail(lookupResult.pnr)}`);
       const json = await res.json().catch(() => null);
       if (res.ok && json?.success) {
         setLookupResult(json.data as BookingRecord);

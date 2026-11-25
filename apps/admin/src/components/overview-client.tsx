@@ -15,6 +15,7 @@ import {
   Users,
 } from "lucide-react";
 import { useAuth } from "@busms/api-client/auth";
+import { API_ENDPOINTS } from "@busms/config/endpoints";
 import {
   Alert,
   Badge,
@@ -107,14 +108,14 @@ export function OverviewClient() {
     queryKey: ["overview-kpis", startDate, endDate],
     queryFn: async () => {
       const [revenue, occupancy, routePerf, agentSales] = await Promise.all([
-        adminFetch<RevenueReport>(`/api/admin/reports/revenue/${qsString}`, getValidAccessToken),
-        adminFetch<OccupancyReport>(`/api/admin/reports/occupancy/${qsString}`, getValidAccessToken),
+        adminFetch<RevenueReport>(`${API_ENDPOINTS.ADMIN_REPORTS.REVENUE}${qsString}`, getValidAccessToken),
+        adminFetch<OccupancyReport>(`${API_ENDPOINTS.ADMIN_REPORTS.OCCUPANCY}${qsString}`, getValidAccessToken),
         adminFetch<RoutePerformanceReport>(
-          `/api/admin/reports/route-performance/${qsString}`,
+          `${API_ENDPOINTS.ADMIN_REPORTS.ROUTE_PERFORMANCE}${qsString}`,
           getValidAccessToken
         ),
         adminFetch<AgentSalesReport>(
-          `/api/admin/reports/agent-sales/${qsString}`,
+          `${API_ENDPOINTS.ADMIN_REPORTS.AGENT_SALES}${qsString}`,
           getValidAccessToken
         ),
       ]);

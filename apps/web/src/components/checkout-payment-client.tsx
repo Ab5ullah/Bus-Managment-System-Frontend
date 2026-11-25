@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, CreditCard, ShieldCheck, Ticket } from "lucide-react";
-import { ApiException, getDefaultApiBaseUrl } from "@busms/api-client";
+import { ApiException, API_ENDPOINTS, getDefaultApiBaseUrl } from "@busms/api-client";
 import { useAuth } from "@busms/api-client/auth";
 import {
   Alert,
@@ -54,7 +54,7 @@ export function CheckoutPaymentClient({ pnr }: { pnr: string }) {
     queryKey: ["booking-detail", pnr],
     queryFn: async () => {
       const token = await getValidAccessToken();
-      const res = await fetch(`${baseUrl}/api/bookings/${encodeURIComponent(pnr)}/`, {
+      const res = await fetch(`${baseUrl}${API_ENDPOINTS.BOOKINGS.detail(pnr)}`, {
         headers: token ? { Authorization: `Bearer ${token}` } : undefined,
       });
       const json = await res.json().catch(() => null);
@@ -75,7 +75,7 @@ export function CheckoutPaymentClient({ pnr }: { pnr: string }) {
     try {
       const token = await getValidAccessToken();
       const returnUrl = `${window.location.origin}/${locale}/checkout/return`;
-      const res = await fetch(`${baseUrl}/api/payments/initiate/`, {
+      const res = await fetch(`${baseUrl}${API_ENDPOINTS.PAYMENTS.INITIATE}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -111,7 +111,7 @@ export function CheckoutPaymentClient({ pnr }: { pnr: string }) {
       }
 
       if (gatewayName === "mock") {
-        const confirmRes = await fetch(`${baseUrl}/api/payments/confirm-mock/`, {
+        const confirmRes = await fetch(`${baseUrl}${API_ENDPOINTS.PAYMENTS.CONFIRM_MOCK}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({

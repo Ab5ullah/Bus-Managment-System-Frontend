@@ -1,5 +1,6 @@
 "use client";
 
+import { API_ENDPOINTS } from "@busms/config/endpoints";
 import React, {
   createContext,
   useCallback,
@@ -51,7 +52,7 @@ export function AuthProvider({ children, skipInitialRefresh = false }: AuthProvi
 
     const promise = (async () => {
       try {
-        const res = await fetch("/api/session/refresh", {
+        const res = await fetch(API_ENDPOINTS.BFF.REFRESH, {
           method: "POST",
           credentials: "include",
           headers: { "Content-Type": "application/json" },
@@ -109,7 +110,7 @@ export function AuthProvider({ children, skipInitialRefresh = false }: AuthProvi
   }, [refreshSession, skipInitialRefresh]);
 
   const login = useCallback(async (identifier: string, password: string): Promise<AuthSession> => {
-    const res = await fetch("/api/session/login", {
+    const res = await fetch(API_ENDPOINTS.BFF.LOGIN, {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
@@ -142,7 +143,7 @@ export function AuthProvider({ children, skipInitialRefresh = false }: AuthProvi
     accessTokenRef.current = null;
     setSession(null);
 
-    await fetch("/api/session/logout", {
+    await fetch(API_ENDPOINTS.BFF.LOGOUT, {
       method: "POST",
       credentials: "include",
       headers: {

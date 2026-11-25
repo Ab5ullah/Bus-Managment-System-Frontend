@@ -1,6 +1,7 @@
 import { decodeJwtPayload } from "../auth/jwt";
 import type { AuthUser, PassengerProfile } from "../types";
 import type { UserRole } from "@busms/config/constants";
+import { API_ENDPOINTS } from "@busms/config/endpoints";
 
 export const REFRESH_COOKIE_NAME = "busms_refresh";
 
@@ -74,7 +75,7 @@ export async function handleBffLogin(request: Request, config?: BffConfig): Prom
     );
   }
 
-  const backendUrl = `${getBackendBaseUrl(config)}/api/auth/login/`;
+  const backendUrl = `${getBackendBaseUrl(config)}${API_ENDPOINTS.AUTH.LOGIN}`;
   let upstream: Response;
   try {
     upstream = await fetch(backendUrl, {
@@ -167,7 +168,7 @@ export async function handleBffRefresh(request: Request, config?: BffConfig): Pr
   const baseUrl = getBackendBaseUrl(config);
   let upstream: Response;
   try {
-    upstream = await fetch(`${baseUrl}/api/auth/refresh/`, {
+    upstream = await fetch(`${baseUrl}${API_ENDPOINTS.AUTH.REFRESH}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ refresh: refreshToken }),
@@ -228,7 +229,7 @@ export async function handleBffRefresh(request: Request, config?: BffConfig): Pr
   };
 
   try {
-    const profileRes = await fetch(`${baseUrl}/api/accounts/profile/`, {
+    const profileRes = await fetch(`${baseUrl}${API_ENDPOINTS.ACCOUNTS.PROFILE}`, {
       method: "GET",
       headers: { Authorization: `Bearer ${newAccess}` },
     });
@@ -274,7 +275,7 @@ export async function handleBffLogout(request: Request, config?: BffConfig): Pro
   const authHeader = request.headers.get("authorization");
 
   if (refreshToken && authHeader) {
-    await fetch(`${getBackendBaseUrl(config)}/api/auth/logout/`, {
+    await fetch(`${getBackendBaseUrl(config)}${API_ENDPOINTS.AUTH.LOGOUT}`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

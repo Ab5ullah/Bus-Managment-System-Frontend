@@ -1,4 +1,4 @@
-import { getDefaultApiBaseUrl, normalizePaginated, type PaginatedData } from "@busms/api-client";
+import { API_ENDPOINTS, getDefaultApiBaseUrl, normalizePaginated, type PaginatedData } from "@busms/api-client";
 
 export interface PopularRouteItem {
   route_id: string;
@@ -179,7 +179,7 @@ async function fetchJsonSafe<T>(path: string, revalidateSeconds = 30): Promise<T
 }
 
 export async function fetchPopularRoutes(): Promise<PopularRoutesPayload> {
-  const data = await fetchJsonSafe<PopularRoutesPayload>("/api/search/popular/", 60);
+  const data = await fetchJsonSafe<PopularRoutesPayload>(API_ENDPOINTS.SEARCH.POPULAR, 60);
   if (!data) {
     return { cities: [], popular_routes: [] };
   }
@@ -204,7 +204,7 @@ export async function fetchTerminals(params: {
   if (params.search) qs.set("search", params.search);
 
   const data = await fetchJsonSafe<PaginatedData<TerminalItem> | TerminalItem[]>(
-    `/api/routes/terminals/?${qs.toString()}`,
+    `${API_ENDPOINTS.ROUTES.TERMINALS}?${qs.toString()}`,
     30
   );
   return normalizePaginated(data, params.pageSize ?? 12);
@@ -222,14 +222,14 @@ export async function fetchRoutes(params: {
   if (params.search) qs.set("search", params.search);
 
   const data = await fetchJsonSafe<PaginatedData<RouteListItem> | RouteListItem[]>(
-    `/api/routes/?${qs.toString()}`,
+    `${API_ENDPOINTS.ROUTES.LIST}?${qs.toString()}`,
     30
   );
   return normalizePaginated(data, params.pageSize ?? 12);
 }
 
 export async function fetchRouteDetail(routeId: string): Promise<RouteDetailItem | null> {
-  return fetchJsonSafe<RouteDetailItem>(`/api/routes/${routeId}/`, 60);
+  return fetchJsonSafe<RouteDetailItem>(API_ENDPOINTS.ROUTES.detail(routeId), 60);
 }
 
 export interface SearchTripsQuery {
@@ -258,7 +258,7 @@ export async function fetchTripSearch(
 
   const baseUrl = getDefaultApiBaseUrl().replace(/\/$/, "");
   try {
-    const res = await fetch(`${baseUrl}/api/search/trips/?${qs.toString()}`, {
+    const res = await fetch(`${baseUrl}${API_ENDPOINTS.SEARCH.TRIPS}?${qs.toString()}`, {
       cache: "no-store",
     });
     const json = await res.json().catch(() => null);

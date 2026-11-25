@@ -10,7 +10,7 @@ import {
   type PasswordResetConfirmValues,
   type PasswordResetRequestValues,
 } from "@busms/config/schemas";
-import { getDefaultApiBaseUrl } from "@busms/api-client";
+import { API_ENDPOINTS, getDefaultApiBaseUrl } from "@busms/api-client";
 import {
   Alert,
   Button,
@@ -45,7 +45,7 @@ export default function ForgotPasswordPage() {
   const onRequest = async (values: PasswordResetRequestValues) => {
     setServerError(null);
     try {
-      const res = await fetch(`${baseUrl}/api/auth/password-reset-request/`, {
+      const res = await fetch(`${baseUrl}${API_ENDPOINTS.AUTH.PASSWORD_RESET_REQUEST}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(values),
@@ -65,7 +65,7 @@ export default function ForgotPasswordPage() {
   const onConfirm = async (values: PasswordResetConfirmValues) => {
     setServerError(null);
     try {
-      const res = await fetch(`${baseUrl}/api/auth/password-reset-confirm/`, {
+      const res = await fetch(`${baseUrl}${API_ENDPOINTS.AUTH.PASSWORD_RESET_CONFIRM}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(values),

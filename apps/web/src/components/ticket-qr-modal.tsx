@@ -4,7 +4,7 @@ import React from "react";
 import { useTranslations } from "next-intl";
 import { useQuery } from "@tanstack/react-query";
 import { Download, QrCode, X } from "lucide-react";
-import { getDefaultApiBaseUrl } from "@busms/api-client";
+import { API_ENDPOINTS, getDefaultApiBaseUrl } from "@busms/api-client";
 import { Alert, Button, Skeleton, StatusBadge } from "@busms/ui";
 
 interface TicketItem {
@@ -35,7 +35,7 @@ export function TicketQrModal({
     queryKey: ["account-tickets", pnr],
     queryFn: async () => {
       if (!pnr) return [] as TicketItem[];
-      const res = await fetch(`${baseUrl}/api/tickets/booking/${encodeURIComponent(pnr)}/`);
+      const res = await fetch(`${baseUrl}${API_ENDPOINTS.TICKETS.byBooking(pnr)}`);
       const json = await res.json().catch(() => null);
       if (!res.ok || !json?.success) return [] as TicketItem[];
       return (json.data ?? []) as TicketItem[];
@@ -103,7 +103,7 @@ export function TicketQrModal({
                 </div>
 
                 <a
-                  href={`${baseUrl}/api/tickets/${encodeURIComponent(ticket.ticket_number)}/pdf/`}
+                  href={`${baseUrl}${API_ENDPOINTS.TICKETS.pdf(ticket.ticket_number)}`}
                   target="_blank"
                   rel="noopener noreferrer"
                 >

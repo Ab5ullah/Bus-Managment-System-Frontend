@@ -24,6 +24,7 @@ import {
   formatCurrencyPkr,
 } from "@busms/ui";
 import { useAuth } from "@busms/api-client/auth";
+import { API_ENDPOINTS } from "@busms/config/endpoints";
 import { adminFetch, formatShortDateTime } from "@/lib/admin-api";
 
 interface BookingSeatItem {
@@ -103,7 +104,7 @@ export function CancellationsClient() {
     queryKey: ["cancellation-policies"],
     queryFn: () =>
       adminFetch<CancellationPolicy[] | { results: CancellationPolicy[] }>(
-        "/api/cancellations/policies/",
+        API_ENDPOINTS.CANCELLATIONS.POLICIES,
         getToken
       ),
   });
@@ -116,7 +117,7 @@ export function CancellationsClient() {
   const bookingQuery = useQuery({
     queryKey: ["admin-booking", activePnr],
     queryFn: () =>
-      adminFetch<BookingDetail>(`/api/bookings/${activePnr}/`, getToken),
+      adminFetch<BookingDetail>(API_ENDPOINTS.BOOKINGS.detail(activePnr), getToken),
     enabled: !!activePnr,
     retry: false,
   });
@@ -126,7 +127,7 @@ export function CancellationsClient() {
     queryKey: ["admin-booking-refunds", activePnr],
     queryFn: () =>
       adminFetch<{ refunds: RefundRecord[] }>(
-        `/api/cancellations/refunds/${activePnr}/`,
+        API_ENDPOINTS.CANCELLATIONS.refunds(activePnr),
         getToken
       ),
     enabled: !!activePnr,
@@ -145,7 +146,7 @@ export function CancellationsClient() {
 
   const estimateMutation = useMutation({
     mutationFn: () =>
-      adminFetch<RefundEstimate>("/api/cancellations/estimate/", getToken, {
+      adminFetch<RefundEstimate>(API_ENDPOINTS.CANCELLATIONS.ESTIMATE, getToken, {
         method: "POST",
         body: JSON.stringify({
           pnr: activePnr,
@@ -165,7 +166,7 @@ export function CancellationsClient() {
   const cancelMutation = useMutation({
     mutationFn: () => {
       if (selectedSeatIds.length > 0) {
-        return adminFetch("/api/cancellations/cancel-seats/", getToken, {
+        return adminFetch(API_ENDPOINTS.CANCELLATIONS.CANCEL_SEATS, getToken, {
           method: "POST",
           body: JSON.stringify({
             pnr: activePnr,
@@ -174,7 +175,7 @@ export function CancellationsClient() {
           }),
         });
       }
-      return adminFetch("/api/cancellations/cancel-booking/", getToken, {
+      return adminFetch(API_ENDPOINTS.CANCELLATIONS.CANCEL_BOOKING, getToken, {
         method: "POST",
         body: JSON.stringify({
           pnr: activePnr,
@@ -196,7 +197,7 @@ export function CancellationsClient() {
   const tripCancelMutation = useMutation({
     mutationFn: () =>
       adminFetch<TripCancelResult>(
-        "/api/cancellations/operator/cancel-trip/",
+        API_ENDPOINTS.CANCELLATIONS.OPERATOR_CANCEL_TRIP,
         getToken,
         {
           method: "POST",

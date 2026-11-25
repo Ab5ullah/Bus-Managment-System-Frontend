@@ -1,5 +1,6 @@
 import { getTranslations } from "next-intl/server";
 import type { Metadata } from "next";
+import { OpsShell } from "@/components/ops-shell";
 import { StaffManagementClient } from "@/components/staff-management-client";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -8,5 +9,9 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default function StaffPage() {
-  return <StaffManagementClient />;
+  return (
+    <OpsShell>
+      <StaffManagementClient />
+    </OpsShell>
+  );
 }

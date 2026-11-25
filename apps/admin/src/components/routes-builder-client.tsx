@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowDown, ArrowUp, MapPin, Milestone, Pencil, Plus, Route as RouteIcon, Search, Trash2 } from "lucide-react";
-import { ApiException, normalizePaginated, type PaginatedData } from "@busms/api-client";
+import { ApiException, API_ENDPOINTS, normalizePaginated, type PaginatedData } from "@busms/api-client";
 import { useAuth } from "@busms/api-client/auth";
 import {
   Alert,
@@ -110,7 +110,7 @@ export function RoutesBuilderClient() {
     queryKey: ["admin-all-terminals"],
     queryFn: async () => {
       const raw = await adminFetch<PaginatedData<TerminalRecord> | TerminalRecord[]>(
-        `/api/routes/terminals/?page=1&page_size=100`,
+        `${API_ENDPOINTS.ROUTES.TERMINALS}?page=1&page_size=100`,
         getValidAccessToken
       );
       return normalizePaginated(raw, 100).results;
@@ -122,7 +122,7 @@ export function RoutesBuilderClient() {
     queryKey: ["admin-terminals-page", page, pageSize, search],
     queryFn: async () => {
       const raw = await adminFetch<PaginatedData<TerminalRecord> | TerminalRecord[]>(
-        `/api/routes/terminals/?${qs.toString()}`,
+        `${API_ENDPOINTS.ROUTES.TERMINALS}?${qs.toString()}`,
         getValidAccessToken
       );
       return normalizePaginated(raw, pageSize);
@@ -134,7 +134,7 @@ export function RoutesBuilderClient() {
     queryKey: ["admin-routes-page", page, pageSize, search],
     queryFn: async () => {
       const raw = await adminFetch<PaginatedData<RouteSummary> | RouteSummary[]>(
-        `/api/routes/?${qs.toString()}`,
+        `${API_ENDPOINTS.ROUTES.LIST}?${qs.toString()}`,
         getValidAccessToken
       );
       return normalizePaginated(raw, pageSize);
@@ -145,7 +145,7 @@ export function RoutesBuilderClient() {
   const routeDetailQuery = useQuery({
     queryKey: ["admin-route-detail", selectedRouteId],
     queryFn: () =>
-      adminFetch<RouteDetail>(`/api/routes/${selectedRouteId}/`, getValidAccessToken),
+      adminFetch<RouteDetail>(API_ENDPOINTS.ROUTES.detail(selectedRouteId!), getValidAccessToken),
     enabled: isAuthenticated && Boolean(selectedRouteId),
   });
 
@@ -177,8 +177,8 @@ export function RoutesBuilderClient() {
       };
       await adminFetch(
         editingTerminal
-          ? `/api/routes/terminals/${editingTerminal.id}/`
-          : "/api/routes/terminals/",
+          ? API_ENDPOINTS.ROUTES.terminalDetail(editingTerminal.id)
+          : API_ENDPOINTS.ROUTES.TERMINALS,
         getValidAccessToken,
         {
           method: editingTerminal ? "PATCH" : "POST",
@@ -208,7 +208,7 @@ export function RoutesBuilderClient() {
     setErrorMsg(null);
     setSuccessMsg(null);
     try {
-      const created = await adminFetch<RouteDetail>("/api/routes/", getValidAccessToken, {
+      const created = await adminFetch<RouteDetail>(API_ENDPOINTS.ROUTES.LIST, getValidAccessToken, {
         method: "POST",
         body: JSON.stringify({
           code: routeCode.trim().toUpperCase(),
@@ -235,7 +235,7 @@ export function RoutesBuilderClient() {
     setSuccessMsg(null);
     try {
       await adminFetch(
-        `/api/routes/${selectedRouteId}/update-stops/`,
+        API_ENDPOINTS.ROUTES.updateStops(selectedRouteId),
         getValidAccessToken,
         {
           method: "POST",

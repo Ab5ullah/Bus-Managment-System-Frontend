@@ -6,7 +6,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ShieldCheck } from "lucide-react";
 import { verifyOtpSchema, type VerifyOtpFormValues } from "@busms/config/schemas";
-import { getDefaultApiBaseUrl } from "@busms/api-client";
+import { API_ENDPOINTS, getDefaultApiBaseUrl } from "@busms/api-client";
 import {
   Alert,
   Button,
@@ -43,7 +43,7 @@ function VerifyOtpForm() {
   const onSubmit = async (values: VerifyOtpFormValues) => {
     setServerError(null);
     try {
-      const res = await fetch(`${baseUrl}/api/auth/verify-otp/`, {
+      const res = await fetch(`${baseUrl}${API_ENDPOINTS.AUTH.VERIFY_OTP}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(values),

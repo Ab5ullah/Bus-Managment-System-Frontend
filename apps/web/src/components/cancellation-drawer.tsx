@@ -4,7 +4,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, History, Loader2, X } from "lucide-react";
-import { ApiException, getDefaultApiBaseUrl } from "@busms/api-client";
+import { ApiException, API_ENDPOINTS, getDefaultApiBaseUrl } from "@busms/api-client";
 import { useAuth } from "@busms/api-client/auth";
 import {
   Alert,
@@ -109,7 +109,7 @@ export function CancellationDrawer({
     queryKey: ["refund-estimate", booking?.pnr, selectedSeatIds],
     queryFn: async () => {
       if (!booking) return null;
-      const res = await fetch(`${baseUrl}/api/cancellations/estimate/`, {
+      const res = await fetch(`${baseUrl}${API_ENDPOINTS.CANCELLATIONS.ESTIMATE}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -134,7 +134,7 @@ export function CancellationDrawer({
     queryFn: async () => {
       if (!booking) return [] as RefundAuditItem[];
       const res = await fetch(
-        `${baseUrl}/api/cancellations/refunds/${encodeURIComponent(booking.pnr)}/`
+        `${baseUrl}${API_ENDPOINTS.CANCELLATIONS.refunds(booking.pnr)}`
       );
       const json = await res.json().catch(() => null);
       if (!res.ok || !json?.success) return [] as RefundAuditItem[];
@@ -162,8 +162,8 @@ export function CancellationDrawer({
     try {
       const token = await getValidAccessToken();
       const endpoint = isPartialSelection
-        ? `${baseUrl}/api/cancellations/cancel-seats/`
-        : `${baseUrl}/api/cancellations/cancel-booking/`;
+        ? `${baseUrl}${API_ENDPOINTS.CANCELLATIONS.CANCEL_SEATS}`
+        : `${baseUrl}${API_ENDPOINTS.CANCELLATIONS.CANCEL_BOOKING}`;
 
       const payload = isPartialSelection
         ? { pnr: booking.pnr, seat_ids: selectedSeatIds, reason }

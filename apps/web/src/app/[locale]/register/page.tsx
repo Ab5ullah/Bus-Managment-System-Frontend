@@ -7,7 +7,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { UserPlus } from "lucide-react";
 import { Gender, UserRole } from "@busms/config/constants";
 import { registerSchema, type RegisterFormValues } from "@busms/config/schemas";
-import { getDefaultApiBaseUrl } from "@busms/api-client";
+import { API_ENDPOINTS, getDefaultApiBaseUrl } from "@busms/api-client";
 import {
   Alert,
   Button,
@@ -44,7 +44,7 @@ export default function PassengerRegisterPage() {
   const onSubmit = async (values: RegisterFormValues) => {
     setServerError(null);
     try {
-      const res = await fetch(`${baseUrl}/api/auth/register/`, {
+      const res = await fetch(`${baseUrl}${API_ENDPOINTS.AUTH.REGISTER}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

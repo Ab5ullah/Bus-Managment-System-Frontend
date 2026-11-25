@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Ban, CalendarClock, DollarSign, Plus, Search, Trash2 } from "lucide-react";
 import { SeatType, TripStatus } from "@busms/config/constants";
-import { ApiException, normalizePaginated, type PaginatedData } from "@busms/api-client";
+import { ApiException, API_ENDPOINTS, normalizePaginated, type PaginatedData } from "@busms/api-client";
 import { useAuth } from "@busms/api-client/auth";
 import {
   Alert,
@@ -126,19 +126,19 @@ export function TripsSchedulerClient() {
     queryFn: async () => {
       const [routesRaw, busesRaw, driversRaw, conductorsRaw] = await Promise.all([
         adminFetch<PaginatedData<{ id: string; code: string; name: string }>>(
-          "/api/routes/?page=1&page_size=100",
+          `${API_ENDPOINTS.ROUTES.LIST}?page=1&page_size=100`,
           getValidAccessToken
         ),
         adminFetch<PaginatedData<{ id: string; registration_number: string; bus_type_display: string }>>(
-          "/api/fleet/buses/?page=1&page_size=100",
+          `${API_ENDPOINTS.FLEET.BUSES}?page=1&page_size=100`,
           getValidAccessToken
         ),
         adminFetch<PaginatedData<{ id: string; full_name: string }>>(
-          "/api/fleet/drivers/?page=1&page_size=100",
+          `${API_ENDPOINTS.FLEET.DRIVERS}?page=1&page_size=100`,
           getValidAccessToken
         ),
         adminFetch<PaginatedData<{ id: string; full_name: string }>>(
-          "/api/fleet/conductors/?page=1&page_size=100",
+          `${API_ENDPOINTS.FLEET.CONDUCTORS}?page=1&page_size=100`,
           getValidAccessToken
         ),
       ]);
@@ -162,7 +162,7 @@ export function TripsSchedulerClient() {
       if (search.trim()) qs.set("search", search.trim());
       if (statusFilter) qs.set("status", statusFilter);
       const raw = await adminFetch<PaginatedData<TripListItem> | TripListItem[]>(
-        `/api/trips/?${qs.toString()}`,
+        `${API_ENDPOINTS.TRIPS.LIST}?${qs.toString()}`,
         getValidAccessToken
       );
       return normalizePaginated(raw, pageSize);
@@ -173,7 +173,7 @@ export function TripsSchedulerClient() {
   const tripBlockDetailQuery = useQuery({
     queryKey: ["admin-trip-detail", blockTripId],
     queryFn: async () => {
-      const trip = await adminFetch<TripDetailItem>(`/api/trips/${blockTripId}/`, getValidAccessToken);
+      const trip = await adminFetch<TripDetailItem>(API_ENDPOINTS.TRIPS.detail(blockTripId!), getValidAccessToken);
       const bus = await adminFetch<{
         seats: Array<{
           id: string;
@@ -185,7 +185,7 @@ export function TripsSchedulerClient() {
           is_ladies_only: boolean;
           is_active: boolean;
         }>;
-      }>(`/api/fleet/buses/${trip.bus.id}/`, getValidAccessToken);
+      }>(API_ENDPOINTS.FLEET.busDetail(trip.bus.id), getValidAccessToken);
       return { trip, busSeats: bus.seats };
     },
     enabled: isAuthenticated && Boolean(blockTripId),
@@ -195,7 +195,7 @@ export function TripsSchedulerClient() {
     queryKey: ["admin-fare-rules", page, pageSize],
     queryFn: async () => {
       const raw = await adminFetch<PaginatedData<FareRuleItem> | FareRuleItem[]>(
-        `/api/trips/fare-rules/?page=${page}&page_size=${pageSize}`,
+        `${API_ENDPOINTS.TRIPS.FARE_RULES}?page=${page}&page_size=${pageSize}`,
         getValidAccessToken
       );
       return normalizePaginated(raw, pageSize);
@@ -207,7 +207,7 @@ export function TripsSchedulerClient() {
     queryKey: ["fare-route-stops", fareRouteId],
     queryFn: async () => {
       const detail = await adminFetch<{ stops: RouteStopOption[] }>(
-        `/api/routes/${fareRouteId}/`,
+        API_ENDPOINTS.ROUTES.detail(fareRouteId),
         getValidAccessToken
       );
       return detail.stops ?? [];
@@ -233,7 +233,7 @@ export function TripsSchedulerClient() {
       };
 
       const saved = await adminFetch<TripDetailItem>(
-        editingTrip ? `/api/trips/${editingTrip.id}/` : "/api/trips/",
+        editingTrip ? API_ENDPOINTS.TRIPS.detail(editingTrip.id) : API_ENDPOINTS.TRIPS.LIST,
         getValidAccessToken,
         {
           method: editingTrip ? "PATCH" : "POST",
@@ -258,7 +258,7 @@ export function TripsSchedulerClient() {
     setSuccessMsg(null);
     try {
       for (const seatId of selectedBlockSeats) {
-        await adminFetch(`/api/trips/${blockTripId}/block-seat/`, getValidAccessToken, {
+        await adminFetch(API_ENDPOINTS.TRIPS.blockSeat(blockTripId), getValidAccessToken, {
           method: "POST",
           body: JSON.stringify({ seat_id: seatId, reason: blockReason || "Operational Block" }),
         });
@@ -276,7 +276,7 @@ export function TripsSchedulerClient() {
     setErrorMsg(null);
     try {
       await adminFetch(
-        `/api/trips/${blockTripId}/unblock-seat/${seatId}/`,
+        API_ENDPOINTS.TRIPS.unblockSeat(blockTripId, seatId),
         getValidAccessToken,
         { method: "DELETE" }
       );
@@ -291,7 +291,7 @@ export function TripsSchedulerClient() {
     setErrorMsg(null);
     setSuccessMsg(null);
     try {
-      await adminFetch("/api/trips/fare-rules/", getValidAccessToken, {
+      await adminFetch(API_ENDPOINTS.TRIPS.FARE_RULES, getValidAccessToken, {
         method: "POST",
         body: JSON.stringify({
           route: fareRouteId,
@@ -309,7 +309,7 @@ export function TripsSchedulerClient() {
   };
 
   const handleDeleteFareRule = async (id: string) => {
-    await adminFetch(`/api/trips/fare-rules/${id}/`, getValidAccessToken, { method: "DELETE" });
+    await adminFetch(API_ENDPOINTS.TRIPS.fareRuleDetail(id), getValidAccessToken, { method: "DELETE" });
     await queryClient.invalidateQueries({ queryKey: ["admin-fare-rules"] });
   };
 

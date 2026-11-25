@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Bus, Grid3X3, Pencil, Plus, Search, Trash2, UserCheck, Users } from "lucide-react";
 import { BusStatus, BusType, SeatType } from "@busms/config/constants";
-import { ApiException, normalizePaginated, type PaginatedData } from "@busms/api-client";
+import { ApiException, API_ENDPOINTS, normalizePaginated, type PaginatedData } from "@busms/api-client";
 import { useAuth } from "@busms/api-client/auth";
 import {
   Alert,
@@ -126,7 +126,7 @@ export function FleetStudioClient() {
     queryKey: ["admin-buses", page, pageSize, search],
     queryFn: async () => {
       const raw = await adminFetch<PaginatedData<BusSummary> | BusSummary[]>(
-        `/api/fleet/buses/?${qs.toString()}`,
+        `${API_ENDPOINTS.FLEET.BUSES}?${qs.toString()}`,
         getValidAccessToken
       );
       return normalizePaginated(raw, pageSize);
@@ -136,7 +136,7 @@ export function FleetStudioClient() {
 
   const busDetailQuery = useQuery({
     queryKey: ["admin-bus-detail", studioBusId],
-    queryFn: () => adminFetch<BusDetail>(`/api/fleet/buses/${studioBusId}/`, getValidAccessToken),
+    queryFn: () => adminFetch<BusDetail>(API_ENDPOINTS.FLEET.busDetail(studioBusId!), getValidAccessToken),
     enabled: isAuthenticated && Boolean(studioBusId),
   });
 
@@ -144,7 +144,7 @@ export function FleetStudioClient() {
     queryKey: ["admin-drivers", page, pageSize, search],
     queryFn: async () => {
       const raw = await adminFetch<PaginatedData<DriverRecord> | DriverRecord[]>(
-        `/api/fleet/drivers/?${qs.toString()}`,
+        `${API_ENDPOINTS.FLEET.DRIVERS}?${qs.toString()}`,
         getValidAccessToken
       );
       return normalizePaginated(raw, pageSize);
@@ -156,7 +156,7 @@ export function FleetStudioClient() {
     queryKey: ["admin-conductors", page, pageSize, search],
     queryFn: async () => {
       const raw = await adminFetch<PaginatedData<ConductorRecord> | ConductorRecord[]>(
-        `/api/fleet/conductors/?${qs.toString()}`,
+        `${API_ENDPOINTS.FLEET.CONDUCTORS}?${qs.toString()}`,
         getValidAccessToken
       );
       return normalizePaginated(raw, pageSize);
@@ -192,7 +192,7 @@ export function FleetStudioClient() {
       };
 
       const saved = await adminFetch<BusDetail>(
-        editingBus ? `/api/fleet/buses/${editingBus.id}/` : "/api/fleet/buses/",
+        editingBus ? API_ENDPOINTS.FLEET.busDetail(editingBus.id) : API_ENDPOINTS.FLEET.BUSES,
         getValidAccessToken,
         {
           method: editingBus ? "PATCH" : "POST",
@@ -217,7 +217,7 @@ export function FleetStudioClient() {
     setSuccessMsg(null);
     try {
       await adminFetch<BusDetail>(
-        `/api/fleet/buses/${studioBusId}/generate-seats/`,
+        API_ENDPOINTS.FLEET.generateSeats(studioBusId),
         getValidAccessToken,
         {
           method: "POST",
@@ -244,7 +244,7 @@ export function FleetStudioClient() {
     setErrorMsg(null);
     try {
       await adminFetch(
-        `/api/fleet/buses/${studioBusId}/seats/${seat.id}/`,
+        API_ENDPOINTS.FLEET.busSeatDetail(studioBusId, seat.id),
         getValidAccessToken,
         {
           method: "PATCH",
@@ -269,7 +269,7 @@ export function FleetStudioClient() {
         status: drvStatus,
       };
       await adminFetch(
-        editingDriver ? `/api/fleet/drivers/${editingDriver.id}/` : "/api/fleet/drivers/",
+        editingDriver ? API_ENDPOINTS.FLEET.driverDetail(editingDriver.id) : API_ENDPOINTS.FLEET.DRIVERS,
         getValidAccessToken,
         { method: editingDriver ? "PATCH" : "POST", body: JSON.stringify(payload) }
       );
@@ -285,7 +285,7 @@ export function FleetStudioClient() {
   };
 
   const handleDeleteDriver = async (id: string) => {
-    await adminFetch(`/api/fleet/drivers/${id}/`, getValidAccessToken, { method: "DELETE" });
+    await adminFetch(API_ENDPOINTS.FLEET.driverDetail(id), getValidAccessToken, { method: "DELETE" });
     await queryClient.invalidateQueries({ queryKey: ["admin-drivers"] });
   };
 
@@ -301,8 +301,8 @@ export function FleetStudioClient() {
       };
       await adminFetch(
         editingConductor
-          ? `/api/fleet/conductors/${editingConductor.id}/`
-          : "/api/fleet/conductors/",
+          ? API_ENDPOINTS.FLEET.conductorDetail(editingConductor.id)
+          : API_ENDPOINTS.FLEET.CONDUCTORS,
         getValidAccessToken,
         { method: editingConductor ? "PATCH" : "POST", body: JSON.stringify(payload) }
       );
@@ -318,7 +318,7 @@ export function FleetStudioClient() {
   };
 
   const handleDeleteConductor = async (id: string) => {
-    await adminFetch(`/api/fleet/conductors/${id}/`, getValidAccessToken, { method: "DELETE" });
+    await adminFetch(API_ENDPOINTS.FLEET.conductorDetail(id), getValidAccessToken, { method: "DELETE" });
     await queryClient.invalidateQueries({ queryKey: ["admin-conductors"] });
   };
 

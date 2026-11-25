@@ -11,6 +11,7 @@ import {
   Users,
 } from "lucide-react";
 import { Gender, UserRole } from "@busms/config/constants";
+import { API_ENDPOINTS } from "@busms/config/endpoints";
 import { getDefaultApiBaseUrl } from "@busms/api-client";
 import {
   Alert,
@@ -53,7 +54,7 @@ export function StaffManagementClient() {
     setError(null);
     setSubmitting(true);
     try {
-      const res = await fetch(`${baseUrl}/api/auth/register/`, {
+      const res = await fetch(`${baseUrl}${API_ENDPOINTS.AUTH.REGISTER}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

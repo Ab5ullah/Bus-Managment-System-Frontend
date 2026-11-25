@@ -26,6 +26,8 @@ import {
   formatCurrencyPkr,
 } from "@busms/ui";
 import { useAuth } from "@busms/api-client/auth";
+import { normalizePaginated, type PaginatedData } from "@busms/api-client";
+import { API_ENDPOINTS } from "@busms/config/endpoints";
 import { adminFetch, formatShortDateTime } from "@/lib/admin-api";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -147,22 +149,36 @@ export function PromotionsClient() {
 
   const couponsQuery = useQuery({
     queryKey: ["coupons", couponPage],
-    queryFn: () =>
-      adminFetch<{ results: Coupon[]; count: number }>(
-        `/api/promotions/admin/coupons/?page=${couponPage}&page_size=10`,
+    queryFn: async () => {
+      const raw = await adminFetch<PaginatedData<Coupon> | Coupon[] | { coupons?: Coupon[] }>(
+        `${API_ENDPOINTS.PROMOTIONS.ADMIN_COUPONS}?page=${couponPage}&page_size=10`,
         getToken
-      ),
+      );
+      const unwrapped: PaginatedData<Coupon> | Coupon[] =
+        raw && typeof raw === "object" && !Array.isArray(raw) && "coupons" in raw
+          ? (raw.coupons ?? [])
+          : (raw as PaginatedData<Coupon> | Coupon[]);
+      return normalizePaginated(unwrapped, 10);
+    },
   });
 
   // ─── Dynamic rules query ──────────────────────────────────────────────────
 
   const rulesQuery = useQuery({
     queryKey: ["dynamic-rules", rulePageNum],
-    queryFn: () =>
-      adminFetch<{ results: DynamicPricingRule[]; count: number }>(
-        `/api/promotions/admin/dynamic-rules/?page=${rulePageNum}&page_size=10`,
+    queryFn: async () => {
+      const raw = await adminFetch<
+        PaginatedData<DynamicPricingRule> | DynamicPricingRule[] | { rules?: DynamicPricingRule[] }
+      >(
+        `${API_ENDPOINTS.PROMOTIONS.ADMIN_DYNAMIC_RULES}?page=${rulePageNum}&page_size=10`,
         getToken
-      ),
+      );
+      const unwrapped: PaginatedData<DynamicPricingRule> | DynamicPricingRule[] =
+        raw && typeof raw === "object" && !Array.isArray(raw) && "rules" in raw
+          ? (raw.rules ?? [])
+          : (raw as PaginatedData<DynamicPricingRule> | DynamicPricingRule[]);
+      return normalizePaginated(unwrapped, 10);
+    },
   });
 
   // ─── Coupon CRUD ──────────────────────────────────────────────────────────
@@ -178,12 +194,12 @@ export function PromotionsClient() {
         max_uses_per_user: Number(form.max_uses_per_user),
       };
       if (editCoupon) {
-        return adminFetch(`/api/promotions/admin/coupons/${editCoupon.id}/`, getToken, {
+        return adminFetch(API_ENDPOINTS.PROMOTIONS.adminCouponDetail(editCoupon.id), getToken, {
           method: "PATCH",
           body: JSON.stringify(payload),
         });
       }
-      return adminFetch(`/api/promotions/admin/coupons/`, getToken, {
+      return adminFetch(API_ENDPOINTS.PROMOTIONS.ADMIN_COUPONS, getToken, {
         method: "POST",
         body: JSON.stringify(payload),
       });
@@ -200,7 +216,7 @@ export function PromotionsClient() {
 
   const deleteCouponMutation = useMutation({
     mutationFn: (id: string) =>
-      adminFetch(`/api/promotions/admin/coupons/${id}/`, getToken, { method: "DELETE" }),
+      adminFetch(API_ENDPOINTS.PROMOTIONS.adminCouponDetail(id), getToken, { method: "DELETE" }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["coupons"] }),
   });
 
@@ -224,12 +240,12 @@ export function PromotionsClient() {
         route: null,
       };
       if (editRule) {
-        return adminFetch(`/api/promotions/admin/dynamic-rules/${editRule.id}/`, getToken, {
+        return adminFetch(API_ENDPOINTS.PROMOTIONS.adminDynamicRuleDetail(editRule.id), getToken, {
           method: "PATCH",
           body: JSON.stringify(payload),
         });
       }
-      return adminFetch(`/api/promotions/admin/dynamic-rules/`, getToken, {
+      return adminFetch(API_ENDPOINTS.PROMOTIONS.ADMIN_DYNAMIC_RULES, getToken, {
         method: "POST",
         body: JSON.stringify(payload),
       });
@@ -246,7 +262,7 @@ export function PromotionsClient() {
 
   const deleteRuleMutation = useMutation({
     mutationFn: (id: string) =>
-      adminFetch(`/api/promotions/admin/dynamic-rules/${id}/`, getToken, { method: "DELETE" }),
+      adminFetch(API_ENDPOINTS.PROMOTIONS.adminDynamicRuleDetail(id), getToken, { method: "DELETE" }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["dynamic-rules"] }),
   });
 
@@ -536,7 +552,7 @@ export function PromotionsClient() {
                     </tr>
                   </thead>
                   <tbody className="divide-y">
-                    {couponsQuery.data?.results.map((coupon) => (
+                    {(couponsQuery.data?.results ?? []).map((coupon) => (
                       <tr key={coupon.id} className="hover:bg-muted/30 transition-colors">
                         <td className="px-4 py-3 font-mono font-bold">{coupon.code}</td>
                         <td className="px-4 py-3 text-muted-foreground max-w-xs truncate">
@@ -598,7 +614,7 @@ export function PromotionsClient() {
                         </td>
                       </tr>
                     ))}
-                    {couponsQuery.data?.results.length === 0 && (
+                    {(couponsQuery.data?.results ?? []).length === 0 && (
                       <tr>
                         <td colSpan={7} className="px-4 py-10 text-center text-muted-foreground">
                           {t("promo.noCoupons")}
@@ -792,7 +808,7 @@ export function PromotionsClient() {
                     </tr>
                   </thead>
                   <tbody className="divide-y">
-                    {rulesQuery.data?.results.map((rule) => (
+                    {(rulesQuery.data?.results ?? []).map((rule) => (
                       <tr key={rule.id} className="hover:bg-muted/30 transition-colors">
                         <td className="px-4 py-3 font-medium">{rule.name}</td>
                         <td className="px-4 py-3">
@@ -854,7 +870,7 @@ export function PromotionsClient() {
                         </td>
                       </tr>
                     ))}
-                    {rulesQuery.data?.results.length === 0 && (
+                    {(rulesQuery.data?.results ?? []).length === 0 && (
                       <tr>
                         <td colSpan={7} className="px-4 py-10 text-center text-muted-foreground">
                           {t("promo.noRules")}

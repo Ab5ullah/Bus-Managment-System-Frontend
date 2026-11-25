@@ -35,6 +35,7 @@ import {
   formatCurrencyPkr,
 } from "@busms/ui";
 import { useAuth } from "@busms/api-client/auth";
+import { API_ENDPOINTS } from "@busms/config/endpoints";
 import { adminFetch, formatShortDateTime } from "@/lib/admin-api";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -161,7 +162,7 @@ export function CounterPosClient() {
         page_size: "8",
       });
       return adminFetch<{ results: TripResult[]; count: number; next: string | null }>(
-        `/api/search/trips/?${params}`,
+        `${API_ENDPOINTS.SEARCH.TRIPS}?${params}`,
         getToken
       );
     },
@@ -179,7 +180,7 @@ export function CounterPosClient() {
   const seatsQuery = useQuery({
     queryKey: ["pos-seats", selectedTrip?.id],
     queryFn: () =>
-      adminFetch<SeatInfo[]>(`/api/trips/${selectedTrip!.id}/seats/`, getToken),
+      adminFetch<SeatInfo[]>(API_ENDPOINTS.TRIPS.seats(selectedTrip!.id), getToken),
     enabled: !!selectedTrip,
   });
 
@@ -190,7 +191,7 @@ export function CounterPosClient() {
       const seat_genders = Object.fromEntries(
         selectedSeatIds.map((id) => [id, seatGenders[id] ?? activeGender])
       );
-      return adminFetch<SeatLock>("/api/bookings/lock-seats/", getToken, {
+      return adminFetch<SeatLock>(API_ENDPOINTS.BOOKINGS.LOCK_SEATS, getToken, {
         method: "POST",
         body: JSON.stringify({
           trip_id: selectedTrip!.id,
@@ -241,7 +242,7 @@ export function CounterPosClient() {
           };
         }),
       };
-      return adminFetch<BookingResult>("/api/bookings/counter/", getToken, {
+      return adminFetch<BookingResult>(API_ENDPOINTS.BOOKINGS.COUNTER, getToken, {
         method: "POST",
         body: JSON.stringify(payload),
       });
@@ -249,13 +250,13 @@ export function CounterPosClient() {
     onSuccess: async (data) => {
       setBooking(data);
       // Confirm mock payment
-      await adminFetch("/api/payments/confirm-mock/", getToken, {
+      await adminFetch(API_ENDPOINTS.PAYMENTS.CONFIRM_MOCK, getToken, {
         method: "POST",
         body: JSON.stringify({ pnr: data.pnr, status: "SUCCESS" }),
       });
       // Fetch tickets
       const ticketList = await adminFetch<TicketInfo[]>(
-        `/api/tickets/booking/${data.pnr}/`,
+        API_ENDPOINTS.TICKETS.byBooking(data.pnr),
         getToken
       );
       setTickets(Array.isArray(ticketList) ? ticketList : []);

@@ -5,6 +5,7 @@
   "type": "module",
   "exports": {
     "./constants": "./src/constants.ts",
+    "./endpoints": "./src/endpoints.ts",
     "./schemas": "./src/schemas.ts",
     "./i18n": "./src/i18n/index.ts",
     "./i18n/messages/en": "./src/i18n/messages/en.json",
