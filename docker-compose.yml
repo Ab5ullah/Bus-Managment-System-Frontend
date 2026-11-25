@@ -1,0 +1,32 @@
+services:
+  web:
+    image: node:20-alpine
+    working_dir: /app
+    command: sh -c "corepack enable && pnpm install --frozen-lockfile && pnpm --filter @busms/web build && pnpm --filter @busms/web start --port 3000"
+    ports:
+      - "3000:3000"
+    volumes:
+      - .:/app
+    environment:
+      - NODE_ENV=production
+      - NEXT_PUBLIC_API_BASE_URL=${NEXT_PUBLIC_API_BASE_URL:-http://host.docker.internal:8000}
+      - INTERNAL_API_BASE_URL=${INTERNAL_API_BASE_URL:-http://host.docker.internal:8000}
+      - NEXT_PUBLIC_WEB_URL=http://localhost:3000
+      - NEXT_PUBLIC_ADMIN_URL=http://localhost:3001
+      - AUTH_COOKIE_SECURE=false
+
+  admin:
+    image: node:20-alpine
+    working_dir: /app
+    command: sh -c "corepack enable && pnpm install --frozen-lockfile && pnpm --filter @busms/admin build && pnpm --filter @busms/admin start --port 3001"
+    ports:
+      - "3001:3001"
+    volumes:
+      - .:/app
+    environment:
+      - NODE_ENV=production
+      - NEXT_PUBLIC_API_BASE_URL=${NEXT_PUBLIC_API_BASE_URL:-http://host.docker.internal:8000}
+      - INTERNAL_API_BASE_URL=${INTERNAL_API_BASE_URL:-http://host.docker.internal:8000}
+      - NEXT_PUBLIC_WEB_URL=http://localhost:3000
+      - NEXT_PUBLIC_ADMIN_URL=http://localhost:3001
+      - AUTH_COOKIE_SECURE=false

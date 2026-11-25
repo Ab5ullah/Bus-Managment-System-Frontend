@@ -1,0 +1,66 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 210 20% 98%;
+    --foreground: 222 47% 11%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+    --primary: 173 78% 25%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 214 25% 94%;
+    --secondary-foreground: 222 47% 14%;
+    --muted: 214 20% 95%;
+    --muted-foreground: 215 16% 42%;
+    --accent: 214 28% 92%;
+    --accent-foreground: 222 47% 11%;
+    --destructive: 348 80% 48%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 214 22% 88%;
+    --input: 214 22% 84%;
+    --ring: 173 78% 25%;
+    --radius: 0.5rem;
+    --status-success: 158 72% 32%;
+    --status-warning: 32 95% 44%;
+    --status-danger: 348 80% 48%;
+    --status-info: 221 76% 48%;
+  }
+
+  .dark {
+    --background: 222 36% 7%;
+    --foreground: 210 40% 96%;
+    --card: 222 32% 10%;
+    --card-foreground: 210 40% 96%;
+    --primary: 171 68% 38%;
+    --primary-foreground: 222 47% 8%;
+    --secondary: 217 26% 16%;
+    --secondary-foreground: 210 40% 96%;
+    --muted: 217 26% 15%;
+    --muted-foreground: 215 18% 64%;
+    --accent: 217 26% 18%;
+    --accent-foreground: 210 40% 96%;
+    --destructive: 348 74% 56%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 217 24% 18%;
+    --input: 217 24% 22%;
+    --ring: 171 68% 38%;
+    --status-success: 158 64% 46%;
+    --status-warning: 38 92% 54%;
+    --status-danger: 348 74% 56%;
+    --status-info: 217 88% 62%;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased selection:bg-primary/15 selection:text-primary;
+  }
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}

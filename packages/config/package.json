@@ -1,0 +1,26 @@
+{
+  "name": "@busms/config",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./constants": "./src/constants.ts",
+    "./schemas": "./src/schemas.ts",
+    "./i18n": "./src/i18n/index.ts",
+    "./i18n/messages/en": "./src/i18n/messages/en.json",
+    "./i18n/messages/ur": "./src/i18n/messages/ur.json",
+    "./tailwind-preset": "./src/tailwind-preset.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "zod": "^3.25.67"
+  },
+  "devDependencies": {
+    "tailwindcss": "^3.4.17",
+    "typescript": "^5.8.3",
+    "vitest": "^3.2.4"
+  }
+}
