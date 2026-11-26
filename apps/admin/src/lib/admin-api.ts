@@ -30,9 +30,14 @@ export async function adminFetch<T>(
     const err = json?.error ?? {};
     let message = err.message || json?.detail || `Request failed (${res.status}).`;
     if (err.details && typeof err.details === "object") {
-      const firstDetail = Object.values(err.details).flat()[0];
-      if (typeof firstDetail === "string" && !message.includes(firstDetail)) {
-        message = `${message} ${firstDetail}`;
+      const entries = Object.entries(err.details);
+      const firstEntry = entries[0];
+      if (firstEntry) {
+        const [fieldKey, fieldVal] = firstEntry;
+        const firstDetail = Array.isArray(fieldVal) ? fieldVal[0] : fieldVal;
+        if (typeof firstDetail === "string" && !message.includes(firstDetail)) {
+          message = `${message} (${fieldKey}: ${firstDetail})`;
+        }
       }
     }
     throw new ApiException(message, res.status, err.code || "API_ERROR", err.details || {});

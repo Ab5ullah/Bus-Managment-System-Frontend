@@ -4,11 +4,7 @@ import React, { useState } from "react";
 import { useTranslations } from "next-intl";
 import {
   UserPlus,
-  ShieldCheck,
-  ExternalLink,
   CheckCircle2,
-  Bus,
-  Users,
 } from "lucide-react";
 import { Gender, UserRole } from "@busms/config/constants";
 import { API_ENDPOINTS } from "@busms/config/endpoints";
@@ -25,7 +21,6 @@ import {
   Input,
   Label,
 } from "@busms/ui";
-import { Link } from "@/i18n/routing";
 
 interface CreatedStaffUser {
   id: string;
@@ -91,164 +86,117 @@ export function StaffManagementClient() {
   };
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
+    <div className="mx-auto max-w-3xl space-y-6">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">{t("staff.title")}</h1>
         <p className="mt-1 text-sm text-muted-foreground">{t("staff.subtitle")}</p>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        {/* Create Counter Agent via API */}
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <UserPlus className="h-4 w-4 text-primary" />
-              <span>{t("staff.createCounterAgent")}</span>
-            </CardTitle>
-            <CardDescription>{t("staff.createCounterAgentDesc")}</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {error && <Alert variant="danger">{error}</Alert>}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <UserPlus className="h-4 w-4 text-primary" />
+            <span>{t("staff.createCounterAgent")}</span>
+          </CardTitle>
+          <CardDescription>{t("staff.createCounterAgentDesc")}</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {error && <Alert variant="danger">{error}</Alert>}
 
-            <form onSubmit={handleCreateCounterAgent} className="space-y-4">
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-1.5">
-                  <Label htmlFor="staff-name">{t("staff.fullName")} *</Label>
-                  <Input
-                    id="staff-name"
-                    required
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    placeholder="Hamza Tariq"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="staff-phone">{t("staff.phone")} *</Label>
-                  <Input
-                    id="staff-phone"
-                    required
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    placeholder="+923001112233"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="staff-email">{t("staff.email")}</Label>
-                  <Input
-                    id="staff-email"
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="agent@safarline.pk"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="staff-gender">{t("staff.gender")}</Label>
-                  <select
-                    id="staff-gender"
-                    value={gender}
-                    onChange={(e) => setGender(e.target.value as Gender)}
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-                  >
-                    <option value={Gender.MALE}>Male</option>
-                    <option value={Gender.FEMALE}>Female</option>
-                    <option value={Gender.OTHER}>Other</option>
-                  </select>
-                </div>
-                <div className="space-y-1.5 sm:col-span-2">
-                  <Label htmlFor="staff-password">{t("staff.password")} *</Label>
-                  <Input
-                    id="staff-password"
-                    type="password"
-                    required
-                    minLength={8}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Minimum 8 characters"
-                  />
-                </div>
+          <form onSubmit={handleCreateCounterAgent} className="space-y-4">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="staff-name">{t("staff.fullName")} *</Label>
+                <Input
+                  id="staff-name"
+                  required
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  placeholder="Hamza Tariq"
+                />
               </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="staff-phone">{t("staff.phone")} *</Label>
+                <Input
+                  id="staff-phone"
+                  required
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="+923001112233"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="staff-email">{t("staff.email")}</Label>
+                <Input
+                  id="staff-email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="agent@safarline.pk"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="staff-gender">{t("staff.gender")}</Label>
+                <select
+                  id="staff-gender"
+                  value={gender}
+                  onChange={(e) => setGender(e.target.value as Gender)}
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                >
+                  <option value={Gender.MALE}>Male</option>
+                  <option value={Gender.FEMALE}>Female</option>
+                  <option value={Gender.OTHER}>Other</option>
+                </select>
+              </div>
+              <div className="space-y-1.5 sm:col-span-2">
+                <Label htmlFor="staff-password">{t("staff.password")} *</Label>
+                <Input
+                  id="staff-password"
+                  type="password"
+                  required
+                  minLength={8}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Minimum 8 characters"
+                />
+              </div>
+            </div>
 
-              <Button type="submit" disabled={submitting}>
-                <UserPlus className="me-2 h-4 w-4" />
-                {submitting ? t("common.loading") : t("staff.createBtn")}
-              </Button>
-            </form>
+            <Button type="submit" disabled={submitting}>
+              <UserPlus className="me-2 h-4 w-4" />
+              {submitting ? t("common.loading") : t("staff.createBtn")}
+            </Button>
+          </form>
 
-            {createdList.length > 0 && (
-              <div className="space-y-2 border-t pt-4">
-                <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  {t("staff.recentlyCreated")}
-                </h3>
-                {createdList.map((u) => (
-                  <div
-                    key={u.id}
-                    className="flex flex-wrap items-center justify-between gap-2 rounded-md border bg-emerald-50/50 p-3 text-sm dark:bg-emerald-950/20"
-                  >
-                    <div className="flex items-center gap-2">
-                      <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                      <span className="font-mono font-medium">{u.phone}</span>
-                      {u.email && (
-                        <span className="text-xs text-muted-foreground">({u.email})</span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Badge variant="info">{u.role_display || u.role}</Badge>
-                      <Badge variant={u.is_verified ? "success" : "warning"}>
-                        {u.is_verified ? t("staff.verified") : t("staff.otpPending")}
-                      </Badge>
-                    </div>
+          {createdList.length > 0 && (
+            <div className="space-y-2 border-t pt-4">
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                {t("staff.recentlyCreated")}
+              </h3>
+              {createdList.map((u) => (
+                <div
+                  key={u.id}
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-md border bg-emerald-50/50 p-3 text-sm dark:bg-emerald-950/20"
+                >
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                    <span className="font-mono font-medium">{u.phone}</span>
+                    {u.email && (
+                      <span className="text-xs text-muted-foreground">({u.email})</span>
+                    )}
                   </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Right column: Operator / Conductor via Django Admin + Fleet Crew */}
-        <div className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <ShieldCheck className="h-4 w-4 text-primary" />
-                <span>{t("staff.privilegedRolesTitle")}</span>
-              </CardTitle>
-              <CardDescription>{t("staff.privilegedRolesDesc")}</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <a
-                href={`${baseUrl}/admin/accounts/user/add/`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-              >
-                <span>{t("staff.openDjangoAdmin")}</span>
-                <ExternalLink className="h-4 w-4" />
-              </a>
-              <p className="text-xs text-muted-foreground">{t("staff.djangoAdminNote")}</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Users className="h-4 w-4 text-primary" />
-                <span>{t("staff.crewRosterTitle")}</span>
-              </CardTitle>
-              <CardDescription>{t("staff.crewRosterDesc")}</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Link
-                href="/fleet"
-                className="inline-flex w-full items-center justify-center gap-2 rounded-md border border-input bg-background px-4 py-2 text-sm font-medium transition-colors hover:bg-muted"
-              >
-                <Bus className="h-4 w-4" />
-                <span>{t("nav.fleet")}</span>
-              </Link>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="info">{u.role_display || u.role}</Badge>
+                    <Badge variant={u.is_verified ? "success" : "warning"}>
+                      {u.is_verified ? t("staff.verified") : t("staff.otpPending")}
+                    </Badge>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
