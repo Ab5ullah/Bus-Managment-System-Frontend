@@ -10,7 +10,13 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { ApiException, type AuthSession, type AuthUser, type PassengerProfile } from "../types";
+import {
+  ApiException,
+  extractApiErrorMessage,
+  type AuthSession,
+  type AuthUser,
+  type PassengerProfile,
+} from "../types";
 import { isJwtExpired } from "./jwt";
 
 interface AuthContextValue {
@@ -121,7 +127,7 @@ export function AuthProvider({ children, skipInitialRefresh = false }: AuthProvi
     if (!res.ok || !json?.success) {
       const errObj = json?.error ?? {};
       throw new ApiException(
-        errObj.message || "Authentication failed.",
+        extractApiErrorMessage(json, "Authentication failed."),
         res.status,
         errObj.code || "AUTH_FAILED",
         errObj.details || {}

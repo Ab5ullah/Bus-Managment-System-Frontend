@@ -2,7 +2,12 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { ADMIN_PORTAL_ROLES, UserRole } from "@busms/config/constants";
 import { decodeJwtPayload, extractRoleFromJwt, isJwtExpired } from "../auth/jwt";
 import { handleBffLogin, handleBffLogout, handleBffRefresh, REFRESH_COOKIE_NAME } from "../bff/handlers";
-import { ApiException, unwrapEnvelope } from "../index";
+import {
+  ApiException,
+  extractApiErrorMessage,
+  extractApiFieldErrors,
+  unwrapEnvelope,
+} from "../index";
 
 function makeFakeJwt(payload: Record<string, unknown>): string {
   const header = Buffer.from(JSON.stringify({ alg: "HS256", typ: "JWT" })).toString("base64url");
@@ -181,5 +186,40 @@ describe("unwrapEnvelope", () => {
         response: new Response(null, { status: 403 }),
       })
     ).toThrowError(ApiException);
+  });
+
+  it("extracts specific field validation errors instead of generic summary messages", () => {
+    const payload = {
+      success: false,
+      error: {
+        code: "VALIDATION_ERROR",
+        message: "Validation failed for one or more fields.",
+        details: {
+          phone: ["An account with this phone number already exists."],
+          password: ["This password is too common."],
+        },
+      },
+    };
+
+    expect(extractApiFieldErrors(payload.error.details)).toEqual({
+      phone: "An account with this phone number already exists.",
+      password: "This password is too common.",
+    });
+
+    expect(extractApiErrorMessage(payload)).toBe(
+      "An account with this phone number already exists. This password is too common."
+    );
+
+    const requiredPayload = {
+      success: false,
+      error: {
+        code: "VALIDATION_ERROR",
+        message: "Validation failed for one or more fields.",
+        details: {
+          otp_code: ["This field is required."],
+        },
+      },
+    };
+    expect(extractApiErrorMessage(requiredPayload)).toBe("Otp Code: This field is required.");
   });
 });

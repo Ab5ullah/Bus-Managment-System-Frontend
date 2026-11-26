@@ -22,6 +22,7 @@ import { savedPassengerSchema, type SavedPassengerFormValues } from "@busms/conf
 import {
   ApiException,
   API_ENDPOINTS,
+  extractApiErrorMessage,
   getDefaultApiBaseUrl,
   normalizePaginated,
   type PaginatedData,
@@ -88,6 +89,12 @@ export function AccountPortalClient() {
   const [profileCnic, setProfileCnic] = useState(profile?.cnic_id_number || "");
   const [profileEmergency, setProfileEmergency] = useState(profile?.emergency_contact || "");
   const [profileMsg, setProfileMsg] = useState<string | null>(null);
+  const [profileError, setProfileError] = useState<string | null>(null);
+
+  // Account deletion state
+  const [deletePassword, setDeletePassword] = useState("");
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
 
   React.useEffect(() => {
     if (profile) {
@@ -113,7 +120,7 @@ export function AccountPortalClient() {
       });
       const json = await res.json().catch(() => null);
       if (!res.ok || !json?.success) {
-        throw new ApiException(json?.error?.message || "Could not load bookings.", res.status);
+        throw new ApiException(extractApiErrorMessage(json, "Could not load bookings."), res.status);
       }
       return normalizePaginated<BookingRecord>(
         json.data as PaginatedData<BookingRecord> | BookingRecord[],
@@ -132,7 +139,10 @@ export function AccountPortalClient() {
       });
       const json = await res.json().catch(() => null);
       if (!res.ok || !json?.success) {
-        throw new ApiException(json?.error?.message || "Failed to load saved passengers.", res.status);
+        throw new ApiException(
+          extractApiErrorMessage(json, "Failed to load saved passengers."),
+          res.status
+        );
       }
       const raw = json.data;
       return (Array.isArray(raw) ? raw : raw?.results ?? []) as SavedCompanion[];
@@ -161,7 +171,7 @@ export function AccountPortalClient() {
       const res = await fetch(`${baseUrl}${API_ENDPOINTS.BOOKINGS.detail(cleaned)}`);
       const json = await res.json().catch(() => null);
       if (!res.ok || !json?.success) {
-        setLookupError(json?.error?.message || `No booking found for PNR '${cleaned}'.`);
+        setLookupError(extractApiErrorMessage(json, `No booking found for PNR '${cleaned}'.`));
         return;
       }
       setLookupResult(json.data as BookingRecord);
@@ -191,7 +201,7 @@ export function AccountPortalClient() {
       });
       const json = await res.json().catch(() => null);
       if (!res.ok || !json?.success) {
-        setCompanionError(json?.error?.message || "Could not save companion.");
+        setCompanionError(extractApiErrorMessage(json, "Could not save companion."));
         return;
       }
       setEditingCompanion(null);
@@ -214,6 +224,7 @@ export function AccountPortalClient() {
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     setProfileMsg(null);
+    setProfileError(null);
     const token = await getValidAccessToken();
     const res = await fetch(`${baseUrl}${API_ENDPOINTS.ACCOUNTS.PROFILE}`, {
       method: "PUT",
@@ -232,6 +243,40 @@ export function AccountPortalClient() {
     if (res.ok && json?.success) {
       setProfile(json.data);
       setProfileMsg("Profile updated.");
+    } else {
+      setProfileError(extractApiErrorMessage(json, "Could not update profile."));
+    }
+  };
+
+  const handleDeleteAccount = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setDeleteError(null);
+    if (!deletePassword) {
+      setDeleteError("Enter your current password to delete your account.");
+      return;
+    }
+    setIsDeletingAccount(true);
+    try {
+      const token = await getValidAccessToken();
+      const res = await fetch(`${baseUrl}${API_ENDPOINTS.ACCOUNTS.DELETE_ACCOUNT}`, {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ password: deletePassword }),
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok || !json?.success) {
+        setDeleteError(extractApiErrorMessage(json, "Could not delete account."));
+        return;
+      }
+      await logout();
+      router.replace("/login");
+    } catch {
+      setDeleteError("Unable to reach account deletion service right now.");
+    } finally {
+      setIsDeletingAccount(false);
     }
   };
 
@@ -539,50 +584,80 @@ export function AccountPortalClient() {
 
           {/* TAB: PROFILE */}
           {activeTab === "profile" && (
-            <Card className="max-w-xl">
-              <CardHeader>
-                <CardTitle className="text-base">Account Profile</CardTitle>
-                <CardDescription>
-                  Phone: <span className="font-mono">{user?.phone}</span>
-                  {user?.email ? ` · ${user.email}` : ""}
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <form onSubmit={handleSaveProfile} className="space-y-4">
-                  {profileMsg && <Alert variant="success">{profileMsg}</Alert>}
-                  <div className="space-y-1.5">
-                    <Label>Full Name</Label>
-                    <Input value={profileFullName} onChange={(e) => setProfileFullName(e.target.value)} />
-                  </div>
-                  <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-6 max-w-xl">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Account Profile</CardTitle>
+                  <CardDescription>
+                    Phone: <span className="font-mono">{user?.phone}</span>
+                    {user?.email ? ` · ${user.email}` : ""}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <form onSubmit={handleSaveProfile} className="space-y-4">
+                    {profileMsg && <Alert variant="success">{profileMsg}</Alert>}
+                    {profileError && <Alert variant="danger">{profileError}</Alert>}
                     <div className="space-y-1.5">
-                      <Label>Gender</Label>
-                      <select
-                        value={profileGender}
-                        onChange={(e) => setProfileGender(e.target.value as Gender)}
-                        className="flex h-10 w-full rounded-md border border-input bg-card px-3 text-sm"
-                      >
-                        <option value={Gender.MALE}>Male</option>
-                        <option value={Gender.FEMALE}>Female</option>
-                        <option value={Gender.OTHER}>Other</option>
-                      </select>
+                      <Label>Full Name</Label>
+                      <Input value={profileFullName} onChange={(e) => setProfileFullName(e.target.value)} />
+                    </div>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div className="space-y-1.5">
+                        <Label>Gender</Label>
+                        <select
+                          value={profileGender}
+                          onChange={(e) => setProfileGender(e.target.value as Gender)}
+                          className="flex h-10 w-full rounded-md border border-input bg-card px-3 text-sm"
+                        >
+                          <option value={Gender.MALE}>Male</option>
+                          <option value={Gender.FEMALE}>Female</option>
+                          <option value={Gender.OTHER}>Other</option>
+                        </select>
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label>CNIC / Passport</Label>
+                        <Input value={profileCnic} onChange={(e) => setProfileCnic(e.target.value)} />
+                      </div>
                     </div>
                     <div className="space-y-1.5">
-                      <Label>CNIC / Passport</Label>
-                      <Input value={profileCnic} onChange={(e) => setProfileCnic(e.target.value)} />
+                      <Label>Emergency Contact</Label>
+                      <Input
+                        value={profileEmergency}
+                        onChange={(e) => setProfileEmergency(e.target.value)}
+                      />
                     </div>
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label>Emergency Contact</Label>
-                    <Input
-                      value={profileEmergency}
-                      onChange={(e) => setProfileEmergency(e.target.value)}
-                    />
-                  </div>
-                  <Button type="submit">{t("common.save")}</Button>
-                </form>
-              </CardContent>
-            </Card>
+                    <Button type="submit">{t("common.save")}</Button>
+                  </form>
+                </CardContent>
+              </Card>
+
+              <Card className="border-destructive/40">
+                <CardHeader>
+                  <CardTitle className="text-base text-destructive">Delete Account</CardTitle>
+                  <CardDescription>
+                    Permanently deactivate and anonymize your account. Active upcoming trips must be completed or cancelled first.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <form onSubmit={handleDeleteAccount} className="space-y-3">
+                    {deleteError && <Alert variant="danger">{deleteError}</Alert>}
+                    <div className="space-y-1.5">
+                      <Label htmlFor="delete-account-password">Confirm Current Password</Label>
+                      <Input
+                        id="delete-account-password"
+                        type="password"
+                        value={deletePassword}
+                        onChange={(e) => setDeletePassword(e.target.value)}
+                        placeholder="Enter your password"
+                      />
+                    </div>
+                    <Button type="submit" variant="destructive" disabled={isDeletingAccount}>
+                      {isDeletingAccount ? "Deleting Account..." : "Delete My Account"}
+                    </Button>
+                  </form>
+                </CardContent>
+              </Card>
+            </div>
           )}
         </div>
       )}

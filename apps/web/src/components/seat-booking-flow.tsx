@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useFieldArray, useForm } from "react-hook-form";
@@ -9,7 +10,6 @@ import {
   ArrowLeft,
   CheckCircle2,
   CreditCard,
-  MapPin,
   ShieldCheck,
   Tag,
   Ticket,
@@ -18,7 +18,12 @@ import {
 } from "lucide-react";
 import { Gender, MAX_SEATS_PER_BOOKING } from "@busms/config/constants";
 import { checkoutFormSchema, type CheckoutFormValues } from "@busms/config/schemas";
-import { ApiException, API_ENDPOINTS, getDefaultApiBaseUrl } from "@busms/api-client";
+import {
+  ApiException,
+  API_ENDPOINTS,
+  extractApiErrorMessage,
+  getDefaultApiBaseUrl,
+} from "@busms/api-client";
 import { useAuth } from "@busms/api-client/auth";
 import {
   Alert,
@@ -39,7 +44,7 @@ import {
   isSeatFemaleOnly,
   type SeatMapItem,
 } from "@busms/ui";
-import { Link } from "@/i18n/routing";
+import { Link, usePathname, useRouter } from "@/i18n/routing";
 import { useApiClient } from "@/lib/api";
 
 interface SeatMapResponseData {
@@ -150,7 +155,7 @@ async function fetchJsonWithClient<T>(
   if (!res.ok || !json?.success) {
     const err = json?.error ?? {};
     throw new ApiException(
-      err.message || json?.detail || "Request failed.",
+      extractApiErrorMessage(json, `Request failed (${res.status}).`),
       res.status,
       err.code || "API_ERROR",
       err.details || {}
@@ -169,9 +174,18 @@ export function SeatBookingFlow({
   toStopId: string;
 }) {
   const t = useTranslations();
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const { isAuthenticated, user, profile, getValidAccessToken } = useAuth();
   const api = useApiClient();
+
+  const currentUrlWithParams = useMemo(() => {
+    const qs = searchParams.toString();
+    return qs ? `${pathname}?${qs}` : pathname;
+  }, [pathname, searchParams]);
+  const loginRedirectHref = `/login?next=${encodeURIComponent(currentUrlWithParams)}`;
 
   const baseUrl = getDefaultApiBaseUrl().replace(/\/$/, "");
   const storageKey = `busms_lock_${tripId}_${fromStopId}_${toStopId}`;
@@ -182,6 +196,7 @@ export function SeatBookingFlow({
   const [lockState, setLockState] = useState<LockState | null>(null);
   const [createdBooking, setCreatedBooking] = useState<CreatedBookingSummary | null>(null);
   const [stepError, setStepError] = useState<string | null>(null);
+  const [requiresAuth, setRequiresAuth] = useState(false);
   const [isLocking, setIsLocking] = useState(false);
 
   // Coupon state
@@ -342,9 +357,16 @@ export function SeatBookingFlow({
   const handleAcquireLock = async () => {
     if (selectedSeatIds.length === 0) return;
     setStepError(null);
+    setRequiresAuth(false);
+
+    const token = await getValidAccessToken();
+    if (!isAuthenticated || !token) {
+      router.push(loginRedirectHref);
+      return;
+    }
+
     setIsLocking(true);
     try {
-      const token = await getValidAccessToken();
       const seat_genders = Object.fromEntries(
         selectedSeatIds.map((id) => {
           const seat = seatMapLookup.get(id);
@@ -369,7 +391,12 @@ export function SeatBookingFlow({
       setCouponInput("");
       window.sessionStorage.setItem(storageKey, JSON.stringify(locked));
     } catch (err) {
-      setStepError(err instanceof ApiException ? err.message : "Could not lock selected seats.");
+      if (err instanceof ApiException && err.status === 401) {
+        setRequiresAuth(true);
+        setStepError("Please sign in to your passenger account to lock seats and book.");
+      } else {
+        setStepError(err instanceof ApiException ? err.message : "Could not lock selected seats.");
+      }
       await queryClient.invalidateQueries({ queryKey: ["seat-map", tripId, fromStopId, toStopId] });
     } finally {
       setIsLocking(false);
@@ -382,16 +409,21 @@ export function SeatBookingFlow({
     setLockState(null);
     setCouponPreview(null);
     setStepError(null);
+    setRequiresAuth(false);
     window.sessionStorage.removeItem(storageKey);
 
+    const token = await getValidAccessToken();
     await fetch(`${baseUrl}${API_ENDPOINTS.BOOKINGS.UNLOCK_SEATS}`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
       body: JSON.stringify({ lock_token: tokenToRelease }),
     }).catch(() => undefined);
 
     await queryClient.invalidateQueries({ queryKey: ["seat-map", tripId, fromStopId, toStopId] });
-  }, [lockState, storageKey, baseUrl, queryClient, tripId, fromStopId, toStopId]);
+  }, [lockState, storageKey, baseUrl, queryClient, tripId, fromStopId, toStopId, getValidAccessToken]);
 
   const handleHoldExpired = useCallback(() => {
     setLockState(null);
@@ -466,9 +498,14 @@ export function SeatBookingFlow({
       setCreatedBooking(created);
       setLockState(null);
     } catch (err) {
-      setStepError(
-        err instanceof ApiException ? err.message : "Unable to create booking reservation."
-      );
+      if (err instanceof ApiException && err.status === 401) {
+        setRequiresAuth(true);
+        setStepError("Your session expired. Please sign in again to complete this booking.");
+      } else {
+        setStepError(
+          err instanceof ApiException ? err.message : "Unable to create booking reservation."
+        );
+      }
     }
   };
 
@@ -539,7 +576,18 @@ export function SeatBookingFlow({
         </ol>
       </div>
 
-      {stepError && <Alert variant="danger">{stepError}</Alert>}
+      {stepError && (
+        <Alert variant="danger" className="flex flex-wrap items-center justify-between gap-2">
+          <span>{stepError}</span>
+          {requiresAuth && (
+            <Link href={loginRedirectHref}>
+              <Button size="sm" variant="outline">
+                {t("common.signIn")}
+              </Button>
+            </Link>
+          )}
+        </Alert>
+      )}
 
       {/* STEP 1: SEAT SELECTION */}
       {currentStep === 1 && (
@@ -674,13 +722,23 @@ export function SeatBookingFlow({
                 </div>
               )}
 
+              {!isAuthenticated && (
+                <p className="text-xs text-muted-foreground">
+                  Sign in is required to hold seats and confirm your booking.
+                </p>
+              )}
+
               <Button
                 type="button"
                 className="w-full"
                 disabled={selectedSeatIds.length === 0 || isLocking}
                 onClick={handleAcquireLock}
               >
-                {isLocking ? t("seatBooking.locking") : t("seatBooking.lockSeatsCta")}
+                {isLocking
+                  ? t("seatBooking.locking")
+                  : !isAuthenticated
+                    ? "Sign in to Lock Seats"
+                    : t("seatBooking.lockSeatsCta")}
               </Button>
             </CardContent>
           </Card>

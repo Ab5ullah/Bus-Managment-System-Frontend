@@ -4,7 +4,12 @@ import React, { useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, CreditCard, ShieldCheck, Ticket } from "lucide-react";
-import { ApiException, API_ENDPOINTS, getDefaultApiBaseUrl } from "@busms/api-client";
+import {
+  ApiException,
+  API_ENDPOINTS,
+  extractApiErrorMessage,
+  getDefaultApiBaseUrl,
+} from "@busms/api-client";
 import { useAuth } from "@busms/api-client/auth";
 import {
   Alert,
@@ -44,10 +49,11 @@ export function CheckoutPaymentClient({ pnr }: { pnr: string }) {
   const t = useTranslations();
   const locale = useLocale();
   const router = useRouter();
-  const { getValidAccessToken } = useAuth();
+  const { isAuthenticated, getValidAccessToken } = useAuth();
   const baseUrl = getDefaultApiBaseUrl().replace(/\/$/, "");
 
   const [paymentError, setPaymentError] = useState<string | null>(null);
+  const [requiresAuth, setRequiresAuth] = useState(false);
   const [isInitiating, setIsInitiating] = useState(false);
 
   const bookingQuery = useQuery({
@@ -60,7 +66,7 @@ export function CheckoutPaymentClient({ pnr }: { pnr: string }) {
       const json = await res.json().catch(() => null);
       if (!res.ok || !json?.success) {
         throw new ApiException(
-          json?.error?.message || "Booking not found.",
+          extractApiErrorMessage(json, "Booking not found."),
           res.status,
           json?.error?.code || "NOT_FOUND"
         );
@@ -71,15 +77,22 @@ export function CheckoutPaymentClient({ pnr }: { pnr: string }) {
 
   const handleInitiate = async (gatewayName: "stripe" | "mock") => {
     setPaymentError(null);
+    setRequiresAuth(false);
+    const token = await getValidAccessToken();
+    if (!isAuthenticated || !token) {
+      setRequiresAuth(true);
+      setPaymentError("Please sign in to initiate payment for this reservation.");
+      return;
+    }
+
     setIsInitiating(true);
     try {
-      const token = await getValidAccessToken();
       const returnUrl = `${window.location.origin}/${locale}/checkout/return`;
       const res = await fetch(`${baseUrl}${API_ENDPOINTS.PAYMENTS.INITIATE}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
           pnr,
@@ -92,7 +105,7 @@ export function CheckoutPaymentClient({ pnr }: { pnr: string }) {
       const json = await res.json().catch(() => null);
       if (!res.ok || !json?.success) {
         throw new ApiException(
-          json?.error?.message || "Unable to initiate payment.",
+          extractApiErrorMessage(json, "Unable to initiate payment."),
           res.status,
           json?.error?.code || "PAYMENT_INIT_FAILED"
         );
@@ -113,7 +126,10 @@ export function CheckoutPaymentClient({ pnr }: { pnr: string }) {
       if (gatewayName === "mock") {
         const confirmRes = await fetch(`${baseUrl}${API_ENDPOINTS.PAYMENTS.CONFIRM_MOCK}`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
           body: JSON.stringify({
             payment_id: payload.payment.id,
             status: "SUCCESS",
@@ -122,7 +138,7 @@ export function CheckoutPaymentClient({ pnr }: { pnr: string }) {
         const confirmJson = await confirmRes.json().catch(() => null);
         if (!confirmRes.ok || !confirmJson?.success) {
           throw new ApiException(
-            confirmJson?.error?.message || "Sandbox payment failed.",
+            extractApiErrorMessage(confirmJson, "Sandbox payment failed."),
             confirmRes.status
           );
         }
@@ -137,9 +153,14 @@ export function CheckoutPaymentClient({ pnr }: { pnr: string }) {
 
       throw new ApiException("Gateway did not return a checkout URL.", 502);
     } catch (err) {
-      setPaymentError(
-        err instanceof ApiException ? err.message : "Payment initiation failed. Please try again."
-      );
+      if (err instanceof ApiException && err.status === 401) {
+        setRequiresAuth(true);
+        setPaymentError("Authentication required. Please sign in to complete payment.");
+      } else {
+        setPaymentError(
+          err instanceof ApiException ? err.message : "Payment initiation failed. Please try again."
+        );
+      }
       setIsInitiating(false);
     }
   };
@@ -196,7 +217,18 @@ export function CheckoutPaymentClient({ pnr }: { pnr: string }) {
         </CardHeader>
 
         <CardContent className="space-y-5">
-          {paymentError && <Alert variant="danger">{paymentError}</Alert>}
+          {paymentError && (
+            <Alert variant="danger" className="flex flex-wrap items-center justify-between gap-2">
+              <span>{paymentError}</span>
+              {requiresAuth && (
+                <Link href={`/login?next=${encodeURIComponent(`/checkout/${pnr}`)}`}>
+                  <Button size="sm" variant="outline">
+                    {t("common.signIn")}
+                  </Button>
+                </Link>
+              )}
+            </Alert>
+          )}
 
           {booking.expires_at && (
             <div className="flex items-center justify-between rounded-md border bg-muted/40 px-4 py-2.5 text-xs">

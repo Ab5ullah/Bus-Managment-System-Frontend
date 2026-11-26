@@ -7,7 +7,12 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { UserPlus } from "lucide-react";
 import { Gender, UserRole } from "@busms/config/constants";
 import { registerSchema, type RegisterFormValues } from "@busms/config/schemas";
-import { API_ENDPOINTS, getDefaultApiBaseUrl } from "@busms/api-client";
+import {
+  API_ENDPOINTS,
+  extractApiErrorMessage,
+  extractApiFieldErrors,
+  getDefaultApiBaseUrl,
+} from "@busms/api-client";
 import {
   Alert,
   Button,
@@ -23,11 +28,21 @@ import { Link, useRouter } from "@/i18n/routing";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 
+const REGISTER_FORM_FIELDS = new Set<keyof RegisterFormValues>([
+  "full_name",
+  "phone",
+  "email",
+  "gender",
+  "password",
+]);
+
 export default function PassengerRegisterPage() {
   const t = useTranslations();
   const router = useRouter();
   const baseUrl = getDefaultApiBaseUrl().replace(/\/$/, "");
   const [serverError, setServerError] = useState<string | null>(null);
+  const [unverifiedIdentifier, setUnverifiedIdentifier] = useState<string | null>(null);
+  const [isSendingOtp, setIsSendingOtp] = useState(false);
 
   const form = useForm({
     resolver: zodResolver(registerSchema),
@@ -41,16 +56,56 @@ export default function PassengerRegisterPage() {
     },
   });
 
+  const handleGoToVerifyOtp = async () => {
+    if (!unverifiedIdentifier) return;
+    setIsSendingOtp(true);
+    try {
+      const res = await fetch(`${baseUrl}${API_ENDPOINTS.AUTH.RESEND_OTP}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          identifier: unverifiedIdentifier,
+          purpose: "REGISTRATION",
+        }),
+      });
+      const json = await res.json().catch(() => null);
+      if (res.ok && json?.success) {
+        const qs = new URLSearchParams({ identifier: unverifiedIdentifier, resent: "1" });
+        router.push(`/verify-otp?${qs.toString()}`);
+        return;
+      }
+
+      const msg = extractApiErrorMessage(json, "Could not resend verification OTP.");
+      if (msg.toLowerCase().includes("already verified")) {
+        setUnverifiedIdentifier(null);
+        setServerError("This account is already verified. Please sign in instead.");
+        return;
+      }
+      if (msg.toLowerCase().includes("wait")) {
+        const qs = new URLSearchParams({ identifier: unverifiedIdentifier });
+        router.push(`/verify-otp?${qs.toString()}`);
+        return;
+      }
+      setServerError(msg);
+    } catch {
+      setServerError("Unable to reach verification service.");
+    } finally {
+      setIsSendingOtp(false);
+    }
+  };
+
   const onSubmit = async (values: RegisterFormValues) => {
     setServerError(null);
+    setUnverifiedIdentifier(null);
+    const cleanedPhone = values.phone.replace(/[\s\-]/g, "");
     try {
       const res = await fetch(`${baseUrl}${API_ENDPOINTS.AUTH.REGISTER}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          full_name: values.full_name,
-          phone: values.phone,
-          email: values.email || null,
+          full_name: values.full_name.trim(),
+          phone: cleanedPhone,
+          email: values.email?.trim() || null,
           gender: values.gender,
           password: values.password,
           role: UserRole.PASSENGER,
@@ -58,16 +113,36 @@ export default function PassengerRegisterPage() {
       });
       const json = await res.json().catch(() => null);
       if (!res.ok || !json?.success) {
-        const msg =
-          json?.error?.message ||
-          Object.values(json?.error?.details || {}).flat()[0] ||
-          "Registration failed.";
-        setServerError(String(msg));
+        const fieldErrors = extractApiFieldErrors(json?.error?.details);
+        for (const [field, message] of Object.entries(fieldErrors)) {
+          if (REGISTER_FORM_FIELDS.has(field as keyof RegisterFormValues)) {
+            form.setError(field as keyof RegisterFormValues, {
+              type: "server",
+              message,
+            });
+          }
+        }
+
+        const msg = extractApiErrorMessage(
+          json,
+          `Registration failed (${res.status}).`
+        );
+        setServerError(msg);
+
+        const phoneExists = fieldErrors.phone?.toLowerCase().includes("already exists");
+        const emailExists = fieldErrors.email?.toLowerCase().includes("already exists");
+        if (phoneExists || emailExists) {
+          setUnverifiedIdentifier(
+            emailExists && !phoneExists && values.email?.trim()
+              ? values.email.trim()
+              : cleanedPhone
+          );
+        }
         return;
       }
 
-      const phone = json.data?.user?.phone || values.phone;
-      const qs = new URLSearchParams({ identifier: phone });
+      const phone = json.data?.user?.phone || cleanedPhone;
+      const qs = new URLSearchParams({ identifier: phone, resent: "1" });
       router.push(`/verify-otp?${qs.toString()}`);
     } catch {
       setServerError("Unable to reach registration service.");
@@ -91,7 +166,30 @@ export default function PassengerRegisterPage() {
           </CardHeader>
 
           <CardContent className="space-y-4">
-            {serverError && <Alert variant="danger">{serverError}</Alert>}
+            {serverError && (
+              <Alert variant="danger" className="space-y-2">
+                <p>{serverError}</p>
+                {unverifiedIdentifier && (
+                  <div className="flex flex-wrap items-center gap-2 pt-1">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={isSendingOtp}
+                      onClick={handleGoToVerifyOtp}
+                    >
+                      {isSendingOtp ? "Sending OTP..." : "Verify Account (Enter OTP)"}
+                    </Button>
+                    <Link
+                      href="/login"
+                      className="text-xs font-medium underline underline-offset-2"
+                    >
+                      Sign in instead
+                    </Link>
+                  </div>
+                )}
+              </Alert>
+            )}
 
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-3.5">
               <div className="space-y-1.5">

@@ -101,3 +101,99 @@ export function normalizePaginated<T>(
   return payload;
 }
 
+const GENERIC_VALIDATION_MESSAGES = new Set([
+  "validation failed for one or more fields.",
+  "validation failed.",
+  "bad request.",
+  "request failed.",
+  "invalid input.",
+]);
+
+function flattenErrorValue(value: unknown): string | null {
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed || null;
+  }
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const nested = flattenErrorValue(item);
+      if (nested) return nested;
+    }
+    return null;
+  }
+  if (value && typeof value === "object") {
+    for (const nestedVal of Object.values(value as Record<string, unknown>)) {
+      const nested = flattenErrorValue(nestedVal);
+      if (nested) return nested;
+    }
+  }
+  return null;
+}
+
+function formatFieldLabel(field: string): string {
+  return field
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (ch) => ch.toUpperCase());
+}
+
+/**
+ * Extracts flattened field-level error strings from DRF `error.details`.
+ */
+export function extractApiFieldErrors(details: unknown): Record<string, string> {
+  const result: Record<string, string> = {};
+  if (!details || typeof details !== "object" || Array.isArray(details)) {
+    return result;
+  }
+  for (const [field, rawVal] of Object.entries(details as Record<string, unknown>)) {
+    const msg = flattenErrorValue(rawVal);
+    if (msg) {
+      result[field] = msg;
+    }
+  }
+  return result;
+}
+
+/**
+ * Resolves the most specific user-facing error message from a BUSMS API error envelope,
+ * prioritizing `error.details` whenever `error.message` is a generic validation summary.
+ */
+export function extractApiErrorMessage(payload: unknown, fallback = "Request failed."): string {
+  if (!payload || typeof payload !== "object") {
+    return fallback;
+  }
+  const obj = payload as Record<string, unknown>;
+  const errObj =
+    obj.error && typeof obj.error === "object"
+      ? (obj.error as Record<string, unknown>)
+      : obj;
+
+  const baseMessage =
+    (typeof errObj.message === "string" && errObj.message.trim()) ||
+    (typeof obj.detail === "string" && obj.detail.trim()) ||
+    "";
+
+  const fieldErrors = extractApiFieldErrors(errObj.details);
+  const entries = Object.entries(fieldErrors);
+
+  if (entries.length > 0) {
+    const formatted = entries.map(([field, msg]) => {
+      if (field === "non_field_errors" || field === "detail" || field === "details") {
+        return msg;
+      }
+      const readableField = field.replace(/_/g, " ").toLowerCase();
+      if (msg.toLowerCase().includes(readableField) || msg.toLowerCase().includes(field.toLowerCase())) {
+        return msg;
+      }
+      return `${formatFieldLabel(field)}: ${msg}`;
+    });
+
+    if (!baseMessage || GENERIC_VALIDATION_MESSAGES.has(baseMessage.toLowerCase())) {
+      return formatted.join(" ");
+    }
+    return `${baseMessage} (${formatted[0]})`;
+  }
+
+  return baseMessage || fallback;
+}
+
+

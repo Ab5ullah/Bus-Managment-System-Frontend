@@ -1,6 +1,11 @@
 import createClient, { type Middleware } from "openapi-fetch";
 import type { paths } from "./generated/schema";
-import { ApiException, type ApiErrorEnvelope, type ApiSuccessEnvelope } from "./types";
+import {
+  ApiException,
+  extractApiErrorMessage,
+  type ApiErrorEnvelope,
+  type ApiSuccessEnvelope,
+} from "./types";
 
 export interface CreateApiClientOptions {
   baseUrl?: string;
@@ -59,7 +64,7 @@ export function unwrapEnvelope<T>(result: {
     const err = result.error as Partial<ApiErrorEnvelope> & { detail?: string; message?: string };
     const payload = err?.error;
     throw new ApiException(
-      payload?.message || err?.detail || err?.message || "Request failed.",
+      extractApiErrorMessage(result.error, "Request failed."),
       result.response.status,
       payload?.code || "API_ERROR",
       payload?.details || {}
@@ -70,7 +75,7 @@ export function unwrapEnvelope<T>(result: {
   if (body && typeof body === "object" && "success" in body) {
     if (body.success === false) {
       throw new ApiException(
-        body.error?.message || "Request failed.",
+        extractApiErrorMessage(body, "Request failed."),
         result.response.status,
         body.error?.code || "API_ERROR",
         body.error?.details || {}

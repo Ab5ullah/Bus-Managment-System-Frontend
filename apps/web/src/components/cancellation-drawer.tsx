@@ -4,7 +4,12 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, History, Loader2, X } from "lucide-react";
-import { ApiException, API_ENDPOINTS, getDefaultApiBaseUrl } from "@busms/api-client";
+import {
+  ApiException,
+  API_ENDPOINTS,
+  extractApiErrorMessage,
+  getDefaultApiBaseUrl,
+} from "@busms/api-client";
 import { useAuth } from "@busms/api-client/auth";
 import {
   Alert,
@@ -120,7 +125,7 @@ export function CancellationDrawer({
       const json = await res.json().catch(() => null);
       if (!res.ok || !json?.success) {
         throw new ApiException(
-          json?.error?.message || "Unable to estimate refund.",
+          extractApiErrorMessage(json, "Unable to estimate refund."),
           res.status
         );
       }
@@ -180,7 +185,7 @@ export function CancellationDrawer({
       const json = await res.json().catch(() => null);
       if (!res.ok || !json?.success) {
         throw new ApiException(
-          json?.error?.message || "Cancellation failed.",
+          extractApiErrorMessage(json, "Cancellation failed."),
           res.status
         );
       }

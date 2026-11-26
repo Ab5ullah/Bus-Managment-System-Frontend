@@ -4,6 +4,8 @@ export { API_ENDPOINTS } from "@busms/config/endpoints";
 export { QueryProvider } from "./query-provider";
 export {
   ApiException,
+  extractApiErrorMessage,
+  extractApiFieldErrors,
   normalizePaginated,
   type ApiSuccessEnvelope,
   type ApiErrorEnvelope,

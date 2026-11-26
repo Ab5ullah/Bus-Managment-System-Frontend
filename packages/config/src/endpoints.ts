@@ -11,6 +11,7 @@ export const API_ENDPOINTS = {
   AUTH: {
     REGISTER: "/api/auth/register/",
     VERIFY_OTP: "/api/auth/verify-otp/",
+    RESEND_OTP: "/api/auth/resend-otp/",
     LOGIN: "/api/auth/login/",
     REFRESH: "/api/auth/refresh/",
     LOGOUT: "/api/auth/logout/",
@@ -19,6 +20,7 @@ export const API_ENDPOINTS = {
   },
   ACCOUNTS: {
     PROFILE: "/api/accounts/profile/",
+    DELETE_ACCOUNT: "/api/accounts/delete-account/",
     SAVED_PASSENGERS: "/api/accounts/saved-passengers/",
     savedPassengerDetail: (id: string) =>
       `/api/accounts/saved-passengers/${encodeURIComponent(id)}/`,
