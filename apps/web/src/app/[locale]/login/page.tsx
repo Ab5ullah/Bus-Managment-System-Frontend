@@ -50,6 +50,27 @@ function PassengerLoginForm() {
       const nextParam = searchParams.get("next");
       router.replace(nextParam && nextParam.startsWith("/") ? nextParam : "/account");
     } catch (err) {
+      if (
+        err instanceof ApiException &&
+        (err.code === "ACCOUNT_NOT_VERIFIED" ||
+          err.message.toLowerCase().includes("not verified"))
+      ) {
+        const details = err.details as { identifier?: string; otp_resent?: boolean };
+        const targetId = details?.identifier || values.identifier.trim();
+        const qs = new URLSearchParams({
+          identifier: targetId,
+          unverified: "1",
+        });
+        if (details?.otp_resent) {
+          qs.set("resent", "1");
+        }
+        const nextParam = searchParams.get("next");
+        if (nextParam && nextParam.startsWith("/")) {
+          qs.set("next", nextParam);
+        }
+        router.push(`/verify-otp?${qs.toString()}`);
+        return;
+      }
       setServerError(err instanceof ApiException ? err.message : "Invalid credentials.");
     }
   };

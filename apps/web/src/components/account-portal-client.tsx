@@ -39,6 +39,7 @@ import {
   CardTitle,
   Input,
   Label,
+  LockCountdown,
   PaginationBar,
   Skeleton,
   StatusBadge,
@@ -328,6 +329,7 @@ export function AccountPortalClient() {
           booking={lookupResult}
           onViewTickets={() => setTicketModalPnr(lookupResult.pnr)}
           onCancel={() => setCancelBookingTarget(lookupResult)}
+          onExpired={() => void refreshBookingsAfterCancel()}
           t={t}
         />
       )}
@@ -444,6 +446,7 @@ export function AccountPortalClient() {
                         booking={b}
                         onViewTickets={() => setTicketModalPnr(b.pnr)}
                         onCancel={() => setCancelBookingTarget(b)}
+                        onExpired={() => void queryClient.invalidateQueries({ queryKey: ["my-bookings"] })}
                         t={t}
                       />
                     ))}
@@ -677,13 +680,19 @@ function BookingSummaryCard({
   booking,
   onViewTickets,
   onCancel,
+  onExpired,
   t,
 }: {
   booking: BookingRecord;
   onViewTickets: () => void;
   onCancel: () => void;
+  onExpired?: () => void;
   t: ReturnType<typeof useTranslations>;
 }) {
+  const isPendingUnexpired =
+    booking.status === "PENDING" &&
+    (!booking.expires_at || new Date(booking.expires_at).getTime() > Date.now());
+
   return (
     <Card>
       <CardContent className="flex flex-wrap items-center justify-between gap-4 p-5">
@@ -694,6 +703,9 @@ function BookingSummaryCard({
             </Badge>
             <StatusBadge status={booking.status} />
             <span className="font-mono text-xs text-muted-foreground">{booking.trip_number}</span>
+            {isPendingUnexpired && booking.expires_at && (
+              <LockCountdown lockedUntil={booking.expires_at} onExpire={onExpired} />
+            )}
           </div>
           <p className="text-base font-semibold">
             {booking.origin_city} → {booking.destination_city}
@@ -714,7 +726,7 @@ function BookingSummaryCard({
             <p className="text-[11px] text-muted-foreground">{booking.passenger_name}</p>
           </div>
 
-          {booking.status === "PENDING" && (
+          {isPendingUnexpired && (
             <Link href={`/checkout/${encodeURIComponent(booking.pnr)}`}>
               <Button size="sm">{t("account.payNow")}</Button>
             </Link>
@@ -727,10 +739,14 @@ function BookingSummaryCard({
             </Button>
           )}
 
-          <Button variant="outline" size="sm" className="gap-1.5" onClick={onCancel}>
-            <RotateCcw className="h-4 w-4" />
-            <span>{t("account.manageCancel")}</span>
-          </Button>
+          {booking.status === "EXPIRED" ? (
+            <span className="text-xs text-muted-foreground">Hold expired · Seats released</span>
+          ) : (
+            <Button variant="outline" size="sm" className="gap-1.5" onClick={onCancel}>
+              <RotateCcw className="h-4 w-4" />
+              <span>{t("account.manageCancel")}</span>
+            </Button>
+          )}
         </div>
       </CardContent>
     </Card>

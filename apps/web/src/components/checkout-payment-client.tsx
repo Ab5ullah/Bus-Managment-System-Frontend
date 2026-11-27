@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useCallback, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, CreditCard, ShieldCheck, Ticket } from "lucide-react";
 import {
   ApiException,
@@ -49,12 +49,14 @@ export function CheckoutPaymentClient({ pnr }: { pnr: string }) {
   const t = useTranslations();
   const locale = useLocale();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { isAuthenticated, getValidAccessToken } = useAuth();
   const baseUrl = getDefaultApiBaseUrl().replace(/\/$/, "");
 
   const [paymentError, setPaymentError] = useState<string | null>(null);
   const [requiresAuth, setRequiresAuth] = useState(false);
   const [isInitiating, setIsInitiating] = useState(false);
+  const [holdExpired, setHoldExpired] = useState(false);
 
   const bookingQuery = useQuery({
     queryKey: ["booking-detail", pnr],
@@ -165,6 +167,12 @@ export function CheckoutPaymentClient({ pnr }: { pnr: string }) {
     }
   };
 
+  const handleHoldExpire = useCallback(() => {
+    setHoldExpired(true);
+    setPaymentError("The 10-minute payment window expired. Your seats have been released.");
+    void queryClient.invalidateQueries({ queryKey: ["booking-detail", pnr] });
+  }, [queryClient, pnr]);
+
   if (bookingQuery.isLoading) {
     return <Skeleton className="mx-auto h-96 max-w-2xl" />;
   }
@@ -178,6 +186,12 @@ export function CheckoutPaymentClient({ pnr }: { pnr: string }) {
   }
 
   const booking = bookingQuery.data;
+  const isExpiredState =
+    booking.status === "EXPIRED" ||
+    booking.status === "CANCELLED" ||
+    holdExpired ||
+    (booking.status === "PENDING" &&
+      Boolean(booking.expires_at && new Date(booking.expires_at).getTime() <= Date.now()));
 
   if (booking.status === "CONFIRMED") {
     return (
@@ -189,6 +203,31 @@ export function CheckoutPaymentClient({ pnr }: { pnr: string }) {
         <CardContent>
           <Link href={`/checkout/return?payment_status=success&pnr=${encodeURIComponent(booking.pnr)}`}>
             <Button>View Boarding Passes</Button>
+          </Link>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (booking.status === "EXPIRED" || booking.status === "CANCELLED" || isExpiredState) {
+    return (
+      <Card className="mx-auto max-w-xl">
+        <CardHeader>
+          <div className="flex items-center justify-between gap-2">
+            <CardTitle>Reservation {booking.pnr} has expired</CardTitle>
+            <StatusBadge status={booking.status === "PENDING" ? "EXPIRED" : booking.status} />
+          </div>
+          <CardDescription>
+            Payment was not completed within the 10-minute hold window, so the reservation was
+            automatically cancelled and its seats were unlocked for other passengers.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-wrap gap-3">
+          <Link href="/search">
+            <Button>Search Trips Again</Button>
+          </Link>
+          <Link href="/account">
+            <Button variant="outline">View My Bookings</Button>
           </Link>
         </CardContent>
       </Card>
@@ -233,7 +272,7 @@ export function CheckoutPaymentClient({ pnr }: { pnr: string }) {
           {booking.expires_at && (
             <div className="flex items-center justify-between rounded-md border bg-muted/40 px-4 py-2.5 text-xs">
               <span>Reservation hold remaining</span>
-              <LockCountdown lockedUntil={booking.expires_at} />
+              <LockCountdown lockedUntil={booking.expires_at} onExpire={handleHoldExpire} />
             </div>
           )}
 

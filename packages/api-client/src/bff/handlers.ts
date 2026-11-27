@@ -131,6 +131,61 @@ export async function handleBffLogin(request: Request, config?: BffConfig): Prom
     );
   }
 
+  if (user.is_verified === false) {
+    const baseUrl = getBackendBaseUrl(config);
+    const identifierForOtp = user.phone || user.email || body.identifier;
+
+    // Best-effort revoke the unused refresh token and trigger a fresh registration OTP
+    await fetch(`${baseUrl}${API_ENDPOINTS.AUTH.LOGOUT}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${tokens.access}`,
+      },
+      body: JSON.stringify({ refresh: tokens.refresh }),
+    }).catch(() => undefined);
+
+    let otpResent = false;
+    try {
+      const resendRes = await fetch(`${baseUrl}${API_ENDPOINTS.AUTH.RESEND_OTP}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          identifier: identifierForOtp,
+          purpose: "REGISTRATION",
+        }),
+      });
+      otpResent = resendRes.ok;
+    } catch {
+      otpResent = false;
+    }
+
+    const clearCookie = serializeCookie(REFRESH_COOKIE_NAME, "", {
+      httpOnly: true,
+      secure: shouldUseSecureCookie(config),
+      sameSite: "lax",
+      path: "/",
+      maxAge: 0,
+    });
+
+    return jsonResponse(
+      {
+        success: false,
+        error: {
+          code: "ACCOUNT_NOT_VERIFIED",
+          message:
+            "Your account is not verified. Please enter the 6-digit OTP to verify your account.",
+          details: {
+            identifier: identifierForOtp,
+            otp_resent: otpResent,
+          },
+        },
+      },
+      403,
+      clearCookie
+    );
+  }
+
   const cookie = serializeCookie(REFRESH_COOKIE_NAME, tokens.refresh, {
     httpOnly: true,
     secure: shouldUseSecureCookie(config),
@@ -244,6 +299,28 @@ export async function handleBffRefresh(request: Request, config?: BffConfig): Pr
     }
   } catch {
     // Non-fatal: JWT claims already hydrate core user identity
+  }
+
+  if (user.is_verified === false) {
+    const clearCookie = serializeCookie(REFRESH_COOKIE_NAME, "", {
+      httpOnly: true,
+      secure: shouldUseSecureCookie(config),
+      sameSite: "lax",
+      path: "/",
+      maxAge: 0,
+    });
+    return jsonResponse(
+      {
+        success: false,
+        error: {
+          code: "ACCOUNT_NOT_VERIFIED",
+          message: "Your account is not verified. Please verify your account via OTP.",
+          details: { identifier: user.phone || user.email || "" },
+        },
+      },
+      401,
+      clearCookie
+    );
   }
 
   const setCookie = serializeCookie(REFRESH_COOKIE_NAME, rotatedRefresh, {

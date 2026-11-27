@@ -170,6 +170,109 @@ describe("BFF Auth Handlers", () => {
     expect(logoutRes.status).toBe(200);
     expect(logoutRes.headers.get("set-cookie")).toContain("Max-Age=0");
   });
+
+  it("blocks login when user is_verified is false, clears cookie, and triggers resend-otp", async () => {
+    const futureExp = Math.floor(Date.now() / 1000) + 3600;
+    const access = makeFakeJwt({ user_id: "u3", role: UserRole.PASSENGER, exp: futureExp });
+    const refresh = makeFakeJwt({ user_id: "u3", role: UserRole.PASSENGER, exp: futureExp + 86400 });
+
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            success: true,
+            data: {
+              user: {
+                id: "u3",
+                phone: "03144123911",
+                email: null,
+                role: UserRole.PASSENGER,
+                role_display: "Passenger",
+                is_verified: false,
+                created_at: "2026-11-26T12:02:02Z",
+              },
+              tokens: { access, refresh },
+            },
+          }),
+          { status: 200 }
+        )
+      )
+      .mockResolvedValueOnce(new Response(JSON.stringify({ success: true }), { status: 200 }))
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ success: true, data: { cooldown_seconds: 60 } }), {
+          status: 200,
+        })
+      );
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    const req = new Request("http://localhost:3000/api/session/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ identifier: "03144123911", password: "Password123!" }),
+    });
+
+    const res = await handleBffLogin(req, { backendBaseUrl: "http://127.0.0.1:8000" });
+    expect(res.status).toBe(403);
+    expect(res.headers.get("set-cookie")).toContain("Max-Age=0");
+
+    const body = await res.json();
+    expect(body.success).toBe(false);
+    expect(body.error.code).toBe("ACCOUNT_NOT_VERIFIED");
+    expect(body.error.details).toEqual({
+      identifier: "03144123911",
+      otp_resent: true,
+    });
+  });
+
+  it("clears refresh session if user profile shows is_verified is false", async () => {
+    const futureExp = Math.floor(Date.now() / 1000) + 3600;
+    const access = makeFakeJwt({ user_id: "u3", role: UserRole.PASSENGER, exp: futureExp });
+    const refresh = makeFakeJwt({ user_id: "u3", role: UserRole.PASSENGER, exp: futureExp + 86400 });
+
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({ success: true, data: { access, refresh } }),
+          { status: 200 }
+        )
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            success: true,
+            data: {
+              id: "p3",
+              full_name: "Abdullah",
+              gender: "MALE",
+              user: {
+                id: "u3",
+                phone: "03144123911",
+                role: UserRole.PASSENGER,
+                is_verified: false,
+              },
+            },
+          }),
+          { status: 200 }
+        )
+      );
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    const req = new Request("http://localhost:3000/api/session/refresh", {
+      method: "POST",
+      headers: { cookie: `${REFRESH_COOKIE_NAME}=unverified_refresh` },
+    });
+
+    const res = await handleBffRefresh(req, { backendBaseUrl: "http://127.0.0.1:8000" });
+    expect(res.status).toBe(401);
+    expect(res.headers.get("set-cookie")).toContain("Max-Age=0");
+
+    const body = await res.json();
+    expect(body.error.code).toBe("ACCOUNT_NOT_VERIFIED");
+  });
 });
 
 describe("unwrapEnvelope", () => {

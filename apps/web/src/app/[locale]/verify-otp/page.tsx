@@ -34,10 +34,18 @@ function VerifyOtpForm() {
   const baseUrl = getDefaultApiBaseUrl().replace(/\/$/, "");
   const initialIdentifier = searchParams.get("identifier") || "";
   const justSent = searchParams.get("resent") === "1";
+  const fromUnverifiedLogin = searchParams.get("unverified") === "1";
+  const nextParam = searchParams.get("next");
 
   const [serverError, setServerError] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(
-    justSent ? "A 6-digit verification OTP has been sent to your phone/email." : null
+    fromUnverifiedLogin
+      ? justSent
+        ? "Your account is not verified yet. A fresh 6-digit OTP has been sent to your phone/email."
+        : "Your account is not verified yet. Enter the 6-digit OTP sent to your phone/email, or click Resend OTP."
+      : justSent
+        ? "A 6-digit verification OTP has been sent to your phone/email."
+        : null
   );
   const [cooldown, setCooldown] = useState<number>(justSent ? 60 : 0);
   const [isResending, setIsResending] = useState(false);
@@ -84,7 +92,11 @@ function VerifyOtpForm() {
         setServerError(extractApiErrorMessage(json, "Invalid or expired OTP code."));
         return;
       }
-      router.replace("/login?verified=1");
+      const loginQs = new URLSearchParams({ verified: "1" });
+      if (nextParam && nextParam.startsWith("/")) {
+        loginQs.set("next", nextParam);
+      }
+      router.replace(`/login?${loginQs.toString()}`);
     } catch {
       setServerError("Unable to verify OTP right now.");
     }

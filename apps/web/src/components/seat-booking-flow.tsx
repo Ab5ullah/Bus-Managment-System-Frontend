@@ -509,6 +509,15 @@ export function SeatBookingFlow({
     }
   };
 
+  const handleCreatedBookingExpired = useCallback(() => {
+    setCreatedBooking(null);
+    setSelectedSeatIds([]);
+    setStepError(
+      "Your 10-minute payment window expired without payment. The reservation was cancelled and seats were unlocked."
+    );
+    void queryClient.invalidateQueries({ queryKey: ["seat-map", tripId, fromStopId, toStopId] });
+  }, [queryClient, tripId, fromStopId, toStopId]);
+
   const currentStep = createdBooking ? 3 : lockState ? 2 : 1;
 
   if (!fromStopId || !toStopId) {
@@ -1060,7 +1069,10 @@ export function SeatBookingFlow({
             {createdBooking.expires_at && (
               <div className="flex items-center justify-between rounded-md border bg-muted/40 px-4 py-2.5 text-xs">
                 <span>Complete payment before reservation expires:</span>
-                <LockCountdown lockedUntil={createdBooking.expires_at} />
+                <LockCountdown
+                  lockedUntil={createdBooking.expires_at}
+                  onExpire={handleCreatedBookingExpired}
+                />
               </div>
             )}
 
